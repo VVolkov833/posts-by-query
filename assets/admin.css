@@ -52,7 +52,12 @@
     box-shadow: 1px 1px 3px -1px rgba(0,0,0,0.75);
     white-space:nowrap;
     overflow:hidden;
+    cursor:pointer;
 }
 #fcppbk-tiles input {
     margin-top:0;
+}
+#fcppbk-posts-preview label {
+    opacity:0.7;
+    pointer-events:none;
 }

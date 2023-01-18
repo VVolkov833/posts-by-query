@@ -75,62 +75,80 @@ add_action( 'admin_enqueue_scripts', function() {
 // api to fetch the query
 add_action( 'rest_api_init', function () {
 
+    $route_args = function($results_format) {
+
+        $wp_query_args = [
+            'post_type' => ['post'],
+            'post_status' => 'publish',
+            //'sentence' => true,
+            //'posts_per_page' => 20,
+        ];
+
+        $format_output = function() {
+            return get_the_title();
+        };
+
+
+        switch ( $results_format ) {
+            case ( 'list' ):
+                //$wp_query_args += [ 'orderby' => 'title', 'order' => 'ASC' ];
+            break;
+            case ( 'query' ):
+                $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC' ];
+                $format_output = function() {
+                    return '(' . get_the_date() . ') ' . get_the_title();
+                };
+            break;
+        }
+
+        return [
+            'methods'  => 'GET',
+            'callback' => function( \WP_REST_Request $request ) use ( $wp_query_args, $format_output ) {
+
+                $wp_query_args['s'] = $request['search'];
+
+                $search = new \WP_Query( $wp_query_args );
     
-
-    $args = [
-        'methods'  => 'GET',
-        'callback' => function( \WP_REST_Request $request ) {
-
-
-            $args = [
-                //'post_type' => 'post', // looks like some conflict with some plugin.. added the post-type filter lower ++ try fixing
-                'post_status' => 'publish',
-                's' => $request['query'],
-                'orderby' => 'title',
-                'order' => 'ASC',
-                //'sentence' => true,
-            ];
-
-            $search = new \WP_Query( $args );
-            if ( !$search->have_posts() ) {
-                return new \WP_Error( 'nothing_found', 'No results found', [ 'status' => 404 ] );
-            }
-
-            $result = [];
-            while ( $search->have_posts() ) {
-                $search->the_post();
-                if ( get_post_type() !== 'post' ) { continue; }
-                $result[ get_the_ID() ] = get_the_title();
-            }
-
-            $result = new \WP_REST_Response( (object) $result, 200 );
-
-            //nocache_headers();
-
-            return $result;
-        },
-        'permission_callback' => function() {
-            //if ( empty( $_SERVER['HTTP_REFERER'] ) ) { return false; }
-            //if ( strtolower( parse_url( $_SERVER['HTTP_REFERER'], PHP_URL_HOST ) ) !== strtolower( $_SERVER['HTTP_HOST'] ) ) { return false; }
-            //if ( !current_user_can( 'administrator' ) ) { return false; } // doesn't work - use nonce
-            // ++add nonce header https://wordpress.stackexchange.com/questions/320487/how-to-use-current-user-can-in-register-rest-route
-            return true;
-        },
-        'args' => [
-            'query' => [
-                'description' => 'The search query',
-                'type'        => 'string',
-                'validate_callback' => function($param) {
-                    return true;//preg_match( '/^[\w\d\- ]+$/i', $param ) ? true : false;
-                },
-                'sanitize_callback' => function($param, $request, $key) {
-                    return $param;//return htmlspecialchars( wp_unslash( urldecode( $param ) ) );
-			    },
+                if ( !$search->have_posts() ) {
+                    return new \WP_Error( 'nothing_found', 'No results found', [ 'status' => 404 ] );
+                }
+    
+                $result = [];
+                while ( $search->have_posts() ) {
+                    $search->the_post();
+                    $result[ get_the_ID() ] = $format_output();
+                }
+    
+                $result = new \WP_REST_Response( (object) $result, 200 );
+    
+                if ( FCPPBK_DEV ) { nocache_headers(); }
+    
+                return $result;
+            },
+            'permission_callback' => function() {
+                //if ( empty( $_SERVER['HTTP_REFERER'] ) ) { return false; }
+                //if ( strtolower( parse_url( $_SERVER['HTTP_REFERER'], PHP_URL_HOST ) ) !== strtolower( $_SERVER['HTTP_HOST'] ) ) { return false; }
+                //if ( !current_user_can( 'administrator' ) ) { return false; } // doesn't work - use nonce
+                // ++!!add nonce header https://wordpress.stackexchange.com/questions/320487/how-to-use-current-user-can-in-register-rest-route
+                return true;
+            },
+            'args' => [
+                'search' => [
+                    'description' => 'The search query',
+                    'type'        => 'string',
+                    'validate_callback' => function($param) {
+                        return true;//preg_match( '/^[\w\d\- ]+$/i', $param ) ? true : false;
+                    },
+                    'sanitize_callback' => function($param, $request, $key) {
+                        return $param;//return htmlspecialchars( wp_unslash( urldecode( $param ) ) );
+                    },
+                ],
             ],
-        ],
-    ];
+        ];
+    };
 
-    register_rest_route( FCPPBK_SLUG.'/v1', '/posts/(?P<query>.{1,90})', $args );
+    register_rest_route( FCPPBK_SLUG.'/v1', '/list/(?P<search>.{1,90})', $route_args( 'list' ) );
+    register_rest_route( FCPPBK_SLUG.'/v1', '/query/(?P<search>.{1,90})', $route_args( 'query' ) );
 });
 
 
@@ -148,7 +166,7 @@ function metabox_query() {
         ]);
         ?>
         <div>
-            <p><strong>Search Query</strong></p>
+            <p><strong>Posts by Search Query &amp; Date</strong></p>
             <?php
             input( (object) [
                 'name' => 'query',
@@ -282,7 +300,7 @@ add_action( 'save_post', function( $postID ) {
     if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) { return; }
     //if ( !wp_verify_nonce( $_POST[ FCPPBK_PREF.'nounce-name' ], FCPPBK_PREF.'nounce-action' ) ) { return; }
     //if ( !current_user_can( 'edit_post', $postID ) ) { return; }
-    if ( !current_user_can( 'administrator' ) ) { return; }
+    if ( !current_user_can( 'administrator' ) ) { return; } // ++ maybe allow the editors too?
 
     $post = get_post( $postID );
     if ( $post->post_type === 'revision' ) { return; } // update_post_meta fixes the id to the parent, but id can be used before
@@ -299,7 +317,7 @@ add_action( 'save_post', function( $postID ) {
     }
 });
 
-function sanitize_meta( $value, $field, $postID ) {
+function sanitize_meta( $value, $field, $postID ) { // ++ properly before publishing
 
     return $value;
 
@@ -309,7 +327,7 @@ function sanitize_meta( $value, $field, $postID ) {
         return $value[0] === 'on' ? ['on'] : [];
     };
 
-    switch( $field ) {
+    switch ( $field ) {
         case ( 'post-types' ):
             return array_intersect( $value, array_keys( get_all_post_types()['public'] ) );
         break;
