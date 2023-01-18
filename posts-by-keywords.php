@@ -85,7 +85,7 @@ add_action( 'rest_api_init', function () {
         ];
 
         $format_output = function() {
-            return get_the_title();
+            return [ 'id' => get_the_ID(), 'title' => get_the_title() ];
         };
 
 
@@ -96,7 +96,7 @@ add_action( 'rest_api_init', function () {
             case ( 'query' ):
                 $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC' ];
                 $format_output = function() {
-                    return '(' . get_the_date() . ') ' . get_the_title();
+                    return [ 'id' => get_the_ID(), 'title' => get_the_title(), 'date' => get_the_date() ];
                 };
             break;
         }
@@ -105,7 +105,7 @@ add_action( 'rest_api_init', function () {
             'methods'  => 'GET',
             'callback' => function( \WP_REST_Request $request ) use ( $wp_query_args, $format_output ) {
 
-                $wp_query_args['s'] = $request['search'];
+                $wp_query_args['s'] = urldecode( $request['search'] );
 
                 $search = new \WP_Query( $wp_query_args );
     
@@ -116,7 +116,7 @@ add_action( 'rest_api_init', function () {
                 $result = [];
                 while ( $search->have_posts() ) {
                     $search->the_post();
-                    $result[ get_the_ID() ] = $format_output();
+                    $result[] = $format_output(); // not using the id as the key to keep the order in js
                 }
     
                 $result = new \WP_REST_Response( (object) $result, 200 );
@@ -204,6 +204,7 @@ function metabox_query() {
                 'post_type' => 'post',
                 'post_status' => 'publish',
                 'post__in' => $ids,
+                'orderby' => 'post__in',
             ] );
             if ( $search->have_posts() ) {
                 $result = [];

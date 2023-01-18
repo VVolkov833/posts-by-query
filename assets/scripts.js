@@ -5,10 +5,9 @@
 
     // --------------- fetch data
     const fetch_data = async field_name => {
-        console.log( `/wp-json/${slug}/v1/${field_name}/` + encodeURI( $( `#${prefix}${field_name}` ).val() ) );
         return await fetch( `/wp-json/${slug}/v1/${field_name}/` + encodeURI( $( `#${prefix}${field_name}` ).val() ) )
-            .then( response => { console.log( response ); return response.json() } )
-            .then( data => data.data?.status === 200 ? data : [] ); // ++do the proper order whey by date!! looks like the object is treated as array fuck
+            .then( response => response.status === 200 && response.json() || [] )
+            .then( data => data || [] );
 
     };
 
@@ -39,7 +38,7 @@
 
             const data = await fetch_data( 'list' );
             store = data;
-            return Object.values( data );
+            return Object.values( data ).map( a => a['title'] );
 
         }, { // options
             cache: true,
@@ -47,11 +46,12 @@
             full: true,
             //start_length: 3,
             exclude,
+
         }, value => { // function on choose
-            const key = Object.keys( store ).find( key => store[key] === value );
+            const key = Object.keys( store ).find( key => store[key]['title'] === value );
             $( `#${prefix}list` ).val( '' );
-            if ( !store[key] ) { return }
-            $( `#${prefix}posts` ).append( `<label><input type="checkbox" name="${prefix}posts[]" value="${key}" checked> <span>${value}</span></label>` );
+            if ( !key ) { return }
+            $( `#${prefix}posts` ).append( `<label><input type="checkbox" name="${prefix}posts[]" value="${store[key]['id']}" checked> <span>${value}</span></label>` );
             reset_checkboxes_event();
         });
 
@@ -74,8 +74,8 @@
             $target.html( '' );
             if ( $input.val().length < 1 ) { return }
             const data = await fetch_data( 'query' );
-            [ ...Object.values( data ).slice( 0, 4 ), '...' ].forEach( value => {
-                $target.append( `<label><input type="checkbox" disabled> <span>${value}</span></label>` );
+            [ ...Object.values( data ).slice( 0, 4 ), {title: '... ... ...'} ].forEach( value => {
+                $target.append( `<label><input type="checkbox" disabled> <span>${value['date']?`(${value['date']})`:``} ${value['title']}</span></label>` );
             });
         };
         results();
