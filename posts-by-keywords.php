@@ -113,8 +113,8 @@ add_action( 'rest_api_init', function () {
                 return $result;
             },
             'permission_callback' => function() {
-                //if ( empty( $_SERVER['HTTP_REFERER'] ) ) { return false; }
-                //if ( strtolower( parse_url( $_SERVER['HTTP_REFERER'], PHP_URL_HOST ) ) !== strtolower( $_SERVER['HTTP_HOST'] ) ) { return false; }
+                if ( empty( $_SERVER['HTTP_REFERER'] ) ) { return false; }
+                if ( strtolower( parse_url( $_SERVER['HTTP_REFERER'], PHP_URL_HOST ) ) !== strtolower( $_SERVER['HTTP_HOST'] ) ) { return false; }
                 //if ( !current_user_can( 'administrator' ) ) { return false; } // doesn't work - use nonce
                 // ++!!add nonce header https://wordpress.stackexchange.com/questions/320487/how-to-use-current-user-can-in-register-rest-route
                 return true;
@@ -396,6 +396,8 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
             if ( trim( $query ) === '' ) { return; }
             $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC', 's' => $query ]; // ++should I sanitize the $query?
         break;
+        default:
+            return;
     }
 
     $search = new \WP_Query( $wp_query_args );
@@ -436,3 +438,7 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
 // ++dev and not dev modes for everything
 // ++polish for bublishing
 // ++!!! values with ' in picker don't pick
+// ++behaves strange on first update, like there is no s?
+// ++add a global function to print?
+// ++is it allowed to make the gutenberg block??
+// ++check the plugins on reis - what minifies the jss?
