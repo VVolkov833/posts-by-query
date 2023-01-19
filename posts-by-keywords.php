@@ -23,19 +23,6 @@ define( 'FCPPBK_DEV', false );
 define( 'FCPPBK_VER', get_file_data( __FILE__, [ 'ver' => 'Version' ] )[ 'ver' ] . ( FCPPBK_DEV ? time() : '' ) );
 
 
-// print the styles
-add_action( 'wp_enqueue_scripts', function() {
-
-    wp_enqueue_style(
-        'fcp-posts-by-query',
-        plugin_dir_url(__FILE__).'/styles/style-1.css',
-        [],
-        FCPPBK_VER . filemtime( __DIR__.'/styles/style-1.css' ),
-        'all'
-    );
-
-});
-
 // admin interface
 add_action( 'add_meta_boxes', function() {
     if ( !current_user_can( 'administrator' ) ) { return; }
@@ -375,3 +362,70 @@ function sanitize_meta( $value, $field, $postID ) { // ++ properly before publis
 
     return '';
 }
+
+add_shortcode( FCPPBK_SLUG, function($atts = []) {
+    $allowed = [
+        'layout' => 'default',
+        'styles' => 'style-1',
+        'headline' => 'Das könnte Sie auch interessieren',
+    ];
+    $atts = shortcode_atts( $allowed, $atts );
+    
+    $metas = array_map( function( $value ) {
+        return $value[0];
+    }, array_filter( get_post_custom(), function($key) {
+        return strpos( $key, FCPPBK_PREF ) === 0;
+    }, ARRAY_FILTER_USE_KEY ) );
+
+
+    $wp_query_args = [
+        'post_type' => ['post'],
+        'post_status' => 'publish',
+        'posts_per_page' => 3,
+    ];
+
+    $results_format = $metas[ FCPPBK_PREF.'variants' ];
+    switch ( $results_format ) {
+        case ( 'list' ):
+            $ids = unserialize( $metas[ FCPPBK_PREF.'posts' ] ); // ++check how native does it, if any filters
+            $wp_query_args += [ 'post__in' => $ids, 'orderby' => 'post__in' ];
+        break;
+        case ( 'query' ):
+            $query = $metas[ FCPPBK_PREF.'query' ];
+            $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC', 's' => $query ]; // ++should I sanitize the $query?
+        break;
+    }
+
+    $search = new \WP_Query( $wp_query_args );
+
+    if ( !$search->have_posts() ) { return; }
+
+    $template = file_get_contents( __DIR__ . '/templates/' . $atts['layout'] . '.html' );
+
+    $result = [];
+    while ( $search->have_posts() ) {
+        //$search->the_post(); // fails somehow
+        $p = $search->next_post();
+        $excerpt = get_the_excerpt( $p );
+        $excerpt = substr( substr( $excerpt, 0, 120 ), 0, strrpos( $excerpt, ' ' ) ) . '…';
+        $result[] = strtr( $template, [
+            //'%id' => get_the_ID( $p ),
+            '%title' => get_the_title( $p ),
+            //'%date' => get_the_date( $p ),
+            '%permalink' => get_permalink( $p ),
+            '%thumbnail' => get_the_post_thumbnail( $p, 'medium' ),
+            '%excerpt' => $excerpt,
+        ]);
+    }
+
+    //wp_reset_postdata();
+
+    wp_enqueue_style(
+        'fcp-posts-by-query',
+        plugins_url( '/' ,__FILE__ ) . 'styles/style-1.css',
+        [],
+        filemtime( __DIR__.'/styles/style-1.css' ),
+    );
+
+    return '<section class="'.FCPPBK_SLUG.'"><h2>'.$atts['headline'].'</h2>' . implode( '', $result) . '</section>';
+});

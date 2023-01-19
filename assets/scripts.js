@@ -61,7 +61,6 @@
                 e.target.parentNode.remove();
             };
             $( `#${prefix}posts input` ).off( 'change', func ).on( 'change', func );
-            //$( `#${prefix}posts input` ).on( 'change', func );
         };
         reset_checkboxes_event();
     })();
@@ -85,3 +84,5 @@
     })();
 
 }, 300 )}();
+
+// ++ drag and drop to change the order of particular posts
