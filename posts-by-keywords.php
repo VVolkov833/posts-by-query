@@ -435,3 +435,4 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
 // ++remove the not letter at the end of the excerpts!!
 // ++dev and not dev modes for everything
 // ++polish for bublishing
+// ++!!! values with ' in picker don't pick
