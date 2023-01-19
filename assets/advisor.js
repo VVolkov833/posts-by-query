@@ -80,7 +80,7 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
     }
 
     function list_holder_fill() {
-        if ( $input.val().length < ( options?.start_length || 1 ) ) {
+        if ( $input.val().trim().length < ( options?.start_length || 1 ) ) {
             list_holder_remove();
             return;
         }

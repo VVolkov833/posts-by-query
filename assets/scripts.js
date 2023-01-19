@@ -5,7 +5,7 @@
 
     // --------------- fetch data
     const fetch_data = async field_name => {
-        return await fetch( `/wp-json/${slug}/v1/${field_name}/` + encodeURI( $( `#${prefix}${field_name}` ).val() ) )
+        return await fetch( `/wp-json/${slug}/v1/${field_name}/` + encodeURI( $( `#${prefix}${field_name}` ).val().trim() ) )
             .then( response => response.status === 200 && response.json() || [] )
             .then( data => data || [] );
 
@@ -70,9 +70,10 @@
         const $input = $( `#${prefix}query` );
         const $target = $( `#${prefix}posts-preview` );
         const results = async () => {
-            $target.html( '' );
-            if ( $input.val().length < 1 ) { return }
+            $target.html( '' ); // or loader
+            if ( $input.val().trim().length < 1 ) { return }
             const data = await fetch_data( 'query' );
+            $target.html( '' );
             [ ...Object.values( data ).slice( 0, 4 ), {title: '... ... ...'} ].forEach( value => {
                 $target.append( `<label><input type="checkbox" disabled> <span>${value['date']?`(${value['date']})`:``} ${value['title']}</span></label>` );
             });

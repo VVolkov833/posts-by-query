@@ -2,7 +2,7 @@
 /*
 Plugin Name: FCP Posts by Search Query
 Description: Searches and prints the posts tiles by query
-Version: 0.0.1
+Version: 0.0.3
 Requires at least: 5.8
 Tested up to: 6.1
 Requires PHP: 7.4
@@ -124,7 +124,7 @@ add_action( 'rest_api_init', function () {
                     'description' => 'The search query',
                     'type'        => 'string',
                     'validate_callback' => function($param) {
-                        return true;//preg_match( '/^[\w\d\- ]+$/i', $param ) ? true : false;
+                        return trim( $param ) ? true : false;//preg_match( '/^[\w\d\- ]+$/i', $param ) ? true : false;
                     },
                     'sanitize_callback' => function($param, $request, $key) {
                         return $param;//return htmlspecialchars( wp_unslash( urldecode( $param ) ) );
@@ -388,10 +388,12 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
     switch ( $results_format ) {
         case ( 'list' ):
             $ids = unserialize( $metas[ FCPPBK_PREF.'posts' ] ); // ++check how native does it, if any filters
+            if ( empty( $ids ) ) { return; }
             $wp_query_args += [ 'post__in' => $ids, 'orderby' => 'post__in' ];
         break;
         case ( 'query' ):
             $query = $metas[ FCPPBK_PREF.'query' ];
+            if ( trim( $query ) === '' ) { return; }
             $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC', 's' => $query ]; // ++should I sanitize the $query?
         break;
     }
@@ -427,5 +429,9 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
         filemtime( __DIR__.'/styles/style-1.css' ),
     );
 
-    return '<section class="'.FCPPBK_SLUG.'"><h2>'.$atts['headline'].'</h2>' . implode( '', $result) . '</section>';
+    return '<section class="'.FCPPBK_SLUG.' container"><h2>'.$atts['headline'].'</h2>' . implode( '', $result) . '</section>';
 });
+
+// ++remove the not letter at the end of the excerpts!!
+// ++dev and not dev modes for everything
+// ++polish for bublishing
