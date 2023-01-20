@@ -22,6 +22,9 @@ define( 'FCPPBK_PREF', FCPPBK_SLUG.'-' );
 define( 'FCPPBK_DEV', false );
 define( 'FCPPBK_VER', get_file_data( __FILE__, [ 'ver' => 'Version' ] )[ 'ver' ] . ( FCPPBK_DEV ? time() : '' ) );
 
+function get_search_post_types() { // ++replace with the option value
+    return ['post', 'page', 'brustchirurgie', 'gesichtschirurgie', 'koerperchirurgie', 'haut' ];
+}
 
 // admin interface
 add_action( 'add_meta_boxes', function() {
@@ -65,7 +68,7 @@ add_action( 'rest_api_init', function () {
     $route_args = function($results_format) {
 
         $wp_query_args = [
-            'post_type' => ['post'],
+            'post_type' => get_search_post_types(),
             'post_status' => 'publish',
             //'sentence' => true,
             //'posts_per_page' => 20,
@@ -81,9 +84,10 @@ add_action( 'rest_api_init', function () {
                 //$wp_query_args += [ 'orderby' => 'title', 'order' => 'ASC' ];
             break;
             case ( 'query' ):
+                $wp_query_args['post_type'] = ['post'];
                 $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC' ];
-                $format_output = function() {
-                    return [ 'id' => get_the_ID(), 'title' => get_the_title(), 'date' => get_the_date() ];
+                $format_output = function( $p ) {
+                    return [ 'id' => $p->ID, 'title' => '('.$p->post_date.') ' . $p->post_title ]; // ++ format date
                 };
             break;
         }
@@ -188,7 +192,7 @@ function metabox_query() {
         if ( !empty( $ids ) ) {
 
             $search = new \WP_Query( [
-                'post_type' => 'post',
+                'post_type' => get_search_post_types(),
                 'post_status' => 'publish',
                 'post__in' => $ids,
                 'orderby' => 'post__in',
@@ -379,7 +383,7 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
 
 
     $wp_query_args = [
-        'post_type' => ['post'],
+        'post_type' => get_search_post_types(),
         'post_status' => 'publish',
         'posts_per_page' => 3,
     ];
@@ -443,3 +447,4 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
 // ++is it allowed to make the gutenberg block??
 // ++check the plugins on reis - what minifies the jss?
 // ++array_unique before saving.. just so is
+// ++eliminate "keywords"

@@ -94,14 +94,13 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
     }
 
     async function list_holder_content() {
-        const value = $input.val().toLowerCase();
+        const value = $input.val().trim().toLowerCase();
         let content = [],
             arr_low = [],
             list = [];
 
         if ( typeof arr === 'function' ) {
             list = await arr();
-            arr = options?.cache ? list : arr;
         } else
         if ( Array.isArray( arr ) ) {
             list = arr;
