@@ -2,7 +2,7 @@
 /*
 Plugin Name: FCP Posts by Search Query
 Description: Searches and prints the posts tiles by query
-Version: 0.0.3
+Version: 0.0.4
 Requires at least: 5.8
 Tested up to: 6.1
 Requires PHP: 7.4
@@ -71,8 +71,8 @@ add_action( 'rest_api_init', function () {
             //'posts_per_page' => 20,
         ];
 
-        $format_output = function() {
-            return [ 'id' => get_the_ID(), 'title' => get_the_title() ];
+        $format_output = function( $p ) {
+            return [ 'id' => $p->ID, 'title' => $p->post_title ]; // get_the_title() forces different quotes in different languages or so
         };
 
 
@@ -102,8 +102,8 @@ add_action( 'rest_api_init', function () {
     
                 $result = [];
                 while ( $search->have_posts() ) {
-                    $search->the_post();
-                    $result[] = $format_output(); // not using the id as the key to keep the order in js
+                    $p = $search->next_post();
+                    $result[] = $format_output( $p ); // not using the id as the key to keep the order in js
                 }
     
                 $result = new \WP_REST_Response( (object) $result, 200 );
@@ -113,8 +113,8 @@ add_action( 'rest_api_init', function () {
                 return $result;
             },
             'permission_callback' => function() {
-                if ( empty( $_SERVER['HTTP_REFERER'] ) ) { return false; }
-                if ( strtolower( parse_url( $_SERVER['HTTP_REFERER'], PHP_URL_HOST ) ) !== strtolower( $_SERVER['HTTP_HOST'] ) ) { return false; }
+                //if ( empty( $_SERVER['HTTP_REFERER'] ) ) { return false; }
+                //if ( strtolower( parse_url( $_SERVER['HTTP_REFERER'], PHP_URL_HOST ) ) !== strtolower( $_SERVER['HTTP_HOST'] ) ) { return false; }
                 //if ( !current_user_can( 'administrator' ) ) { return false; } // doesn't work - use nonce
                 // ++!!add nonce header https://wordpress.stackexchange.com/questions/320487/how-to-use-current-user-can-in-register-rest-route
                 return true;
@@ -196,8 +196,8 @@ function metabox_query() {
             if ( $search->have_posts() ) {
                 $result = [];
                 while ( $search->have_posts() ) {
-                    $search->the_post();
-                    $result[ get_the_ID() ] = get_the_title();
+                    $p = $search->next_post();
+                    $result[ $p->ID ] = $p->post_title;
                 }
             }
         }
@@ -431,7 +431,7 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
         filemtime( __DIR__.'/styles/style-1.css' ),
     );
 
-    return '<section class="'.FCPPBK_SLUG.' container"><h2>'.$atts['headline'].'</h2>' . implode( '', $result) . '</section>';
+    return '<section class="'.FCPPBK_SLUG.' container"><h2>'.$atts['headline'].'</h2><div>' . implode( '', $result) . '</div></section>';
 });
 
 // ++remove the not letter at the end of the excerpts!!
@@ -442,3 +442,4 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
 // ++add a global function to print?
 // ++is it allowed to make the gutenberg block??
 // ++check the plugins on reis - what minifies the jss?
+// ++array_unique before saving.. just so is

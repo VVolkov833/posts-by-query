@@ -12,33 +12,46 @@
     };
 
     // --------------- tabs
-    const tab_effects = () => {
-        const active_tab = $( `input[type=radio][name=${prefix}variants]:checked` ).val();
-        const effecting = { 'query' : 'posts-preview', 'list' : 'posts' };
-        $( `fieldset` ).css( 'display', 'none' );
-        $( `fieldset#${prefix}${effecting[active_tab]}` ).css( 'display', 'block' );
-    };
-    tab_effects();
-
-    // switching tabs
-    $( `#${prefix}query, #${prefix}list` ).focus( e => {
-        const target_value = e.target.id.replace( prefix, '' );
-        $( `.${prefix}tabs > input[type=radio][name=${prefix}variants][value=${target_value}]` ).prop( 'checked', true );
+    (() => {
+        const tab_effects = () => {
+            const active_tab = $( `input[type=radio][name=${prefix}variants]:checked` ).val();
+            const effecting = { 'query' : 'posts-preview', 'list' : 'posts' };
+            $( `fieldset` ).css( 'display', 'none' );
+            $( `fieldset#${prefix}${effecting[active_tab]}` ).css( 'display', 'block' );
+        };
         tab_effects();
-    });
+
+        // switching tabs
+        $( `#${prefix}query, #${prefix}list` ).focus( e => {
+            const target_value = e.target.id.replace( prefix, '' );
+            $( `.${prefix}tabs > input[type=radio][name=${prefix}variants][value=${target_value}]` ).prop( 'checked', true );
+            tab_effects();
+        });
+    })();
 
     // --------------- the list field
     (() => {
         let store = {};
         const exclude = () => {
-            return [ ...document.querySelectorAll( `#${prefix}posts input:checked + span` ) ].map( a => a.innerHTML );
+            return [ ...document.querySelectorAll( `#${prefix}posts input:checked + span` ) ].map( a => a.textContent );
         };
 
         FCP_Advisor( $( `#${prefix}list` ), async () => {
 
+            const clear_html = string => {
+                const doc = document.implementation.createHTMLDocument( '' ),
+                      a = doc.createElement( 'div' );
+                a.innerHTML = string;
+                return a.textContent;
+            };
+
             const data = await fetch_data( 'list' );
-            store = data;
-            return Object.values( data ).map( a => a['title'] );
+
+            store = Object.values( data ).map( a => {
+                a['title'] = clear_html( a['title'] ); 
+                return a;
+            } );
+            return store.map( a => a['title'] );
 
         }, { // options
             cache: true,
