@@ -5,7 +5,6 @@
 
     // --------------- fetch data
     const fetch_data = async field_name => {
-        console.log( `/wp-json/${slug}/v1/${field_name}/` + encodeURI( $( `#${prefix}${field_name}` ).val().trim() ) );
         return await fetch( `/wp-json/${slug}/v1/${field_name}/` + encodeURI( $( `#${prefix}${field_name}` ).val().trim() ) )
             .then( response => response.status === 200 && response.json() || [] )
             .then( data => data || [] );
@@ -88,7 +87,6 @@
             const data = await fetch_data( 'query' );
             $target.html( '' );
             [ ...Object.values( data ).slice( 0, 4 ), {title: '... ... ...'} ].forEach( value => {
-                console.log( value );
                 $target.append( `<label><input type="checkbox" disabled> <span>${value['date']?`(${value['date']})`:``} ${value['title']}</span></label>` );
             });
         };

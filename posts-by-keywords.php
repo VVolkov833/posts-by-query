@@ -2,7 +2,7 @@
 /*
 Plugin Name: FCP Posts by Search Query
 Description: Searches and prints the posts tiles by query
-Version: 0.0.4
+Version: 0.0.5
 Requires at least: 5.8
 Tested up to: 6.1
 Requires PHP: 7.4
