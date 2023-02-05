@@ -45,18 +45,15 @@ add_action( 'admin_enqueue_scripts', function() {
     $screen = get_current_screen();
     if ( !isset( $screen ) || !is_object( $screen ) || !in_array( $screen->base, [ 'post' ] ) ) { return; }
 
-    foreach ( scandir( __DIR__.'/assets' ) as $v ) {
-        $path = __DIR__.'/assets/'.$v;
-        if ( !is_file( $path ) ) { continue; }
+    $assets_path = __DIR__.'/assets';
+
+    foreach ( scandir( $assets_path ) as $v ) {
+        if ( !is_file( $assets_path.'/'.$v ) ) { continue; }
         $ext = substr( $v, strrpos( $v, '.' )+1 );
         $name = FCPPBK_PREF.preg_replace( ['/\.(?:js|css)$/', '/[^a-z0-9\-_]/'], '', $v );
         $url = plugin_dir_url(__FILE__).'assets/'.$v;
-        if ( $ext === 'css' ) {
-            wp_enqueue_style( $name, $url, [], FCPPBK_VER . filemtime( $path ), 'all' );
-        }
-        if ( $ext === 'js' ) {
-            wp_enqueue_script( $name, $url, [], FCPPBK_VER, false );
-        }
+        if ( $ext === 'css' ) { wp_enqueue_style( $name, $url, [], FCPPBK_VER, 'all' ); }
+        if ( $ext === 'js' ) { wp_enqueue_script( $name, $url, [], FCPPBK_VER, false ); }
     }
 
 });
@@ -71,7 +68,7 @@ add_action( 'rest_api_init', function () {
             'post_type' => get_search_post_types(),
             'post_status' => 'publish',
             //'sentence' => true,
-            //'posts_per_page' => 20,
+            'posts_per_page' => 20,
         ];
 
         $format_output = function( $p ) {
@@ -81,13 +78,14 @@ add_action( 'rest_api_init', function () {
 
         switch ( $results_format ) {
             case ( 'list' ):
-                //$wp_query_args += [ 'orderby' => 'title', 'order' => 'ASC' ];
+                // $wp_query_args += [ 'orderby' => 'title', 'order' => 'ASC' ]; // autocomplete orders by title anyways
             break;
             case ( 'query' ):
                 $wp_query_args['post_type'] = ['post'];
                 $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC' ];
                 $format_output = function( $p ) {
-                    return [ 'id' => $p->ID, 'title' => '('.$p->post_date.') ' . $p->post_title ]; // ++ format date
+                    $date = wp_date( get_option( 'date_format', 'j F Y' ), strtotime( $p->post_date ) );
+                    return [ 'id' => $p->ID, 'title' => '('.$date.') ' . $p->post_title ];
                 };
             break;
         }
@@ -117,10 +115,9 @@ add_action( 'rest_api_init', function () {
                 return $result;
             },
             'permission_callback' => function() {
-                //if ( empty( $_SERVER['HTTP_REFERER'] ) ) { return false; }
-                //if ( strtolower( parse_url( $_SERVER['HTTP_REFERER'], PHP_URL_HOST ) ) !== strtolower( $_SERVER['HTTP_HOST'] ) ) { return false; }
-                //if ( !current_user_can( 'administrator' ) ) { return false; } // doesn't work - use nonce
-                // ++!!add nonce header https://wordpress.stackexchange.com/questions/320487/how-to-use-current-user-can-in-register-rest-route
+                if ( empty( $_SERVER['HTTP_REFERER'] ) ) { return false; }
+                if ( strtolower( parse_url( $_SERVER['HTTP_REFERER'], PHP_URL_HOST ) ) !== strtolower( $_SERVER['HTTP_HOST'] ) ) { return false; }
+                if ( !current_user_can( 'administrator' ) ) { return false; } // works only with X-WP-Nonce header passed
                 return true;
             },
             'args' => [
@@ -215,6 +212,9 @@ function metabox_query() {
         <fieldset id="<?php echo FCPPBK_PREF ?>posts-preview"></fieldset>
     </div>
     
+    <input type="hidden" name="<?php echo FCPPBK_PREF ?>nonce" value="<?= esc_attr( wp_create_nonce( FCPPBK_PREF.'nonce' ) ) ?>">
+    <input type="hidden" id="<?php echo FCPPBK_PREF ?>rest-nonce" value="<?= esc_attr( wp_create_nonce( 'wp_rest' ) ) ?>">
+
     <?php
 }
 
@@ -414,15 +414,20 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
     while ( $search->have_posts() ) {
         //$search->the_post(); // fails somehow
         $p = $search->next_post();
-        $excerpt = get_the_excerpt( $p );
-        $excerpt = substr( substr( $excerpt, 0, 120 ), 0, strrpos( $excerpt, ' ' ) ) . '…';
+        $excerpt = substr( get_the_excerpt( $p ), 0, 186 ); // ++value or 0
+        $excerpt = rtrim( substr( $excerpt, 0, strrpos( $excerpt, ' ' ) ), ',.…!?&([{-_ "„“' ) . '…';
         $result[] = strtr( $template, [
-            //'%id' => get_the_ID( $p ),
-            '%title' => get_the_title( $p ),
-            //'%date' => get_the_date( $p ),
+            '%id' => get_the_ID( $p ),
             '%permalink' => get_permalink( $p ),
-            '%thumbnail' => get_the_post_thumbnail( $p, 'medium' ),
+            '%title' => get_the_title( $p ),
+            '%title_linked' => get_the_title( $p ),
             '%excerpt' => $excerpt,
+
+            '%thumbnail' => get_the_post_thumbnail( $p, 'medium' ), // ++condition
+            '%thumbnail_linked' => '', // ++condition
+            '%date' => get_the_date( '', $p ), // ++format here && condition
+            '%button' => '', // ++format here && condition
+            '%category' => '', // ++format here && condition
         ]);
     }
 
@@ -432,19 +437,42 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
         'fcp-posts-by-query',
         plugins_url( '/' ,__FILE__ ) . 'styles/style-1.css',
         [],
-        filemtime( __DIR__.'/styles/style-1.css' ),
+        FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/styles/style-1.css' ),
     );
 
     return '<section class="'.FCPPBK_SLUG.' container"><h2>'.$atts['headline'].'</h2><div>' . implode( '', $result) . '</div></section>';
 });
 
-// ++remove the not letter at the end of the excerpts!!
-// ++dev and not dev modes for everything
+// all ++ refactor and filters
+// ++admin
 // ++polish for bublishing
-// ++!!! values with ' in picker don't pick
-// ++behaves strange on first update, like there is no s?
+    // excape everything before printing
 // ++add a global function to print?
 // ++is it allowed to make the gutenberg block??
 // ++check the plugins on reis - what minifies the jss?
 // ++array_unique before saving.. just so is
-// ++eliminate "keywords"
+// ++2 more styles? check the todo
+// ++maybe an option with schema?
+// ++abort previous fetch if new one is here
+// ++some hints how it will work
+/* admin
+    maybe some will go to the on-page interface??
+    post types
+        separate for query and for list
+    main color
+    secondary color
+    show date
+    show button
+    show category
+    show the image / size
+    tiles per row
+    excerpt length
+    layout
+        x3-v1
+        x3-v2
+        x2+list
+        list
+    defer styles
+    preview
+    get the first image if no featured
+*/

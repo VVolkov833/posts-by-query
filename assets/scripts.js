@@ -5,9 +5,13 @@
 
     // --------------- fetch data
     const fetch_data = async field_name => {
-        return await fetch( `/wp-json/${slug}/v1/${field_name}/` + encodeURI( $( `#${prefix}${field_name}` ).val().trim() ) )
-            .then( response => response.status === 200 && response.json() || [] )
-            .then( data => data || [] );
+        return await fetch(
+            `/wp-json/${slug}/v1/${field_name}/` + encodeURI( $( `#${prefix}${field_name}` ).val().trim() ),
+            { headers: {
+                'X-WP-Nonce' : $( `#${prefix}rest-nonce` ).val()
+            } })
+        .then( response => response.status === 200 && response.json() || [] )
+        .then( data => data || [] );
 
     };
 
