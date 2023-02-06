@@ -290,7 +290,7 @@ function get_all_post_types() {
 add_action( 'save_post', function( $postID ) {
 
     if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) { return; }
-    //if ( !wp_verify_nonce( $_POST[ FCPPBK_PREF.'nounce-name' ], FCPPBK_PREF.'nounce-action' ) ) { return; }
+    if ( !wp_verify_nonce( $_POST[ FCPPBK_PREF.'nonce' ], FCPPBK_PREF.'nonce' ) ) { return; }
     //if ( !current_user_can( 'edit_post', $postID ) ) { return; }
     if ( !current_user_can( 'administrator' ) ) { return; } // ++ maybe allow the editors too?
 
@@ -456,6 +456,7 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
 // ++abort previous fetch if new one is here
 // ++some hints how it will work
 /* admin
+    post types to apply the meta
     maybe some will go to the on-page interface??
     post types
         separate for query and for list
@@ -472,7 +473,9 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
         x3-v2
         x2+list
         list
-    defer styles
+    defer styles checkbox
+    only admin checkbox (or anyone, who can edit the post)
     preview
     get the first image if no featured
 */
+// ++ drag and drop to change the order of particular posts

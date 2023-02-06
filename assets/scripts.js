@@ -101,5 +101,3 @@
     })();
 
 }, 300 )}();
-
-// ++ drag and drop to change the order of particular posts
