@@ -42,6 +42,7 @@ add_action( 'add_meta_boxes', function() {
 // style meta boxes
 add_action( 'admin_enqueue_scripts', function() {
 
+    if ( !current_user_can( 'administrator' ) ) { return; }
     $screen = get_current_screen();
     if ( !isset( $screen ) || !is_object( $screen ) || !in_array( $screen->base, [ 'post' ] ) ) { return; }
 
@@ -94,7 +95,7 @@ add_action( 'rest_api_init', function () {
             'methods'  => 'GET',
             'callback' => function( \WP_REST_Request $request ) use ( $wp_query_args, $format_output ) {
 
-                $wp_query_args['s'] = urldecode( $request['search'] );
+                $wp_query_args['s'] = $request['search'];
 
                 $search = new \WP_Query( $wp_query_args );
     
@@ -105,7 +106,7 @@ add_action( 'rest_api_init', function () {
                 $result = [];
                 while ( $search->have_posts() ) {
                     $p = $search->next_post();
-                    $result[] = $format_output( $p ); // not using the id as the key to keep the order in js
+                    $result[] = $format_output( $p ); // not using the id as the key to keep the order in json
                 }
     
                 $result = new \WP_REST_Response( (object) $result, 200 );
@@ -125,10 +126,10 @@ add_action( 'rest_api_init', function () {
                     'description' => 'The search query',
                     'type'        => 'string',
                     'validate_callback' => function($param) {
-                        return trim( $param ) ? true : false;//preg_match( '/^[\w\d\- ]+$/i', $param ) ? true : false;
+                        return trim( $param ) ? true : false;
                     },
                     'sanitize_callback' => function($param, $request, $key) {
-                        return $param;//return htmlspecialchars( wp_unslash( urldecode( $param ) ) );
+                        return sanitize_text_field( urldecode( $param ) ); // return htmlspecialchars( wp_unslash( urldecode( $param ) ) );
                     },
                 ],
             ],
@@ -144,7 +145,7 @@ function metabox_query() {
     global $post;
 
     ?>
-    <div class="<?php echo FCPPBK_PREF ?>tabs">
+    <div class="<?php echo esc_attr( FCPPBK_PREF ) ?>tabs">
         <?php
         radiobox( (object) [
             'name' => 'variants',
@@ -183,7 +184,7 @@ function metabox_query() {
         </div>
     </div>
 
-    <div id="<?php echo FCPPBK_PREF ?>tiles">
+    <div id="<?php echo esc_attr( FCPPBK_PREF ) ?>tiles">
         <?php
         $ids = get_post_meta( $post->ID, FCPPBK_PREF.'posts' )[0];
         if ( !empty( $ids ) ) {
@@ -209,11 +210,11 @@ function metabox_query() {
             'value' => $ids,
         ]);
         ?>
-        <fieldset id="<?php echo FCPPBK_PREF ?>posts-preview"></fieldset>
+        <fieldset id="<?php echo esc_attr( FCPPBK_PREF ) ?>posts-preview"></fieldset>
     </div>
     
-    <input type="hidden" name="<?php echo FCPPBK_PREF ?>nonce" value="<?= esc_attr( wp_create_nonce( FCPPBK_PREF.'nonce' ) ) ?>">
-    <input type="hidden" id="<?php echo FCPPBK_PREF ?>rest-nonce" value="<?= esc_attr( wp_create_nonce( 'wp_rest' ) ) ?>">
+    <input type="hidden" name="<?php echo esc_attr( FCPPBK_PREF ) ?>nonce" value="<?= esc_attr( wp_create_nonce( FCPPBK_PREF.'nonce' ) ) ?>">
+    <input type="hidden" id="<?php echo esc_attr( FCPPBK_PREF ) ?>rest-nonce" value="<?= esc_attr( wp_create_nonce( 'wp_rest' ) ) ?>">
 
     <?php
 }
@@ -241,7 +242,7 @@ function checkboxes($a) {
             <input type="checkbox"
                 name="<?php echo esc_attr( FCPPBK_PREF . $a->name ) ?>[]"
                 value="<?php echo esc_attr( $k ) ?>"
-                <?php echo $checked ? 'checked' : '' ?>
+                <?php echo esc_attr( $checked ? 'checked' : '' ) ?>
             >
             <span><?php echo esc_html( $v ) ?></span>
         </label>
@@ -256,7 +257,7 @@ function radiobox($a) {
     <input type="radio"
         name="<?php echo esc_attr( FCPPBK_PREF . $a->name ) ?>"
         value="<?php echo esc_attr( $a->value ) ?>"
-        <?php echo ( $a->checked === $a->value || $a->default && !$checked ) ? 'checked' : '' ?>
+        <?php echo esc_attr( ( $a->checked === $a->value || $a->default && !$checked ) ? 'checked' : '' ) ?>
     >
     <?php
 }
@@ -292,7 +293,7 @@ add_action( 'save_post', function( $postID ) {
     if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) { return; }
     if ( !wp_verify_nonce( $_POST[ FCPPBK_PREF.'nonce' ], FCPPBK_PREF.'nonce' ) ) { return; }
     //if ( !current_user_can( 'edit_post', $postID ) ) { return; }
-    if ( !current_user_can( 'administrator' ) ) { return; } // ++ maybe allow the editors too?
+    if ( !current_user_can( 'administrator' ) ) { return; }
 
     $post = get_post( $postID );
     if ( $post->post_type === 'revision' ) { return; } // update_post_meta fixes the id to the parent, but id can be used before
@@ -309,58 +310,21 @@ add_action( 'save_post', function( $postID ) {
     }
 });
 
-function sanitize_meta( $value, $field, $postID ) { // ++ properly before publishing
+function sanitize_meta( $value, $field, $postID ) {
 
     return $value;
 
     $field = ( strpos( $field, FCPPBK_PREF ) === 0 ) ? substr( $field, strlen( FCPPBK_PREF ) ) : $field;
 
-    $onoff = function($value) {
-        return $value[0] === 'on' ? ['on'] : [];
-    };
-
     switch ( $field ) {
-        case ( 'post-types' ):
-            return array_intersect( $value, array_keys( get_all_post_types()['public'] ) );
+        case ( 'variants' ):
+            return in_array( $value, ['query', 'list'] ) ? $value : 'query';
         break;
-        case ( 'post-archives' ):
-            return array_intersect( $value, array_keys( get_all_post_types()['archive'] ) );
+        case ( 'query' ):
+            return sanitize_text_field( $value );
         break;
-        case ( 'development-mode' ):
-            return $onoff( $value );
-        break;
-        case ( 'deregister-style-names' ):
-            return $value; // ++preg_replace not letters ,space-_, lowercase?, 
-        break;
-        case ( 'deregister-script-names' ):
-            return $value; // ++preg_replace not letters ,space-_, lowercase?, 
-        break;
-        case ( 'rest-css' ):
-
-            list( $errors, $filtered ) = sanitize_css( wp_unslash( $value ) ); //++ move it all to a separate filter / actions, organize better with errors?
-            $file = wp_upload_dir()['basedir'] . '/' . basename( __DIR__ ) . '/style-'.$postID.'.css';
-            // correct
-            if ( empty( $errors ) ) {
-                file_put_contents( $file, css_minify( $filtered ) ); //++ add the permission error
-                return $value;
-            }
-            // wrong
-            unlink( $file );
-            save_errors( $errors, $postID, '#first-screen-css-rest > .inside' );
-            return $value;
-        break;
-        case ( 'rest-css-defer' ):
-            return $onoff( $value );
-        break;
-        case ( 'id' ):
-            if ( !is_numeric( $value ) ) { return ''; } // ++to a function
-            if ( !( $post = get_post( $value ) ) || $post->post_type !== FCPPBK_SLUG ) { return ''; }
-            return $value;
-        break;
-        case ( 'id-exclude' ):
-            if ( !is_numeric( $value ) ) { return ''; }
-            if ( !( $post = get_post( $value ) ) || $post->post_type !== FCPPBK_SLUG ) { return ''; }
-            return $value;
+        case ( 'posts' ):
+            return array_values( array_filter( $value, 'is_numeric' ) ); // post-type & is-published filters are performed before printing on the front-end
         break;
     }
 
@@ -371,7 +335,7 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
     $allowed = [
         'layout' => 'default',
         'styles' => 'style-1',
-        'headline' => 'Das könnte Sie auch interessieren',
+        'headline' => 'Das könnte Sie auch interessieren', //++replace with a wrapper
     ];
     $atts = shortcode_atts( $allowed, $atts );
     
@@ -391,14 +355,14 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
     $results_format = $metas[ FCPPBK_PREF.'variants' ];
     switch ( $results_format ) {
         case ( 'list' ):
-            $ids = unserialize( $metas[ FCPPBK_PREF.'posts' ] ); // ++check how native does it, if any filters
+            $ids = unserialize( $metas[ FCPPBK_PREF.'posts' ] ); // ++ filter by post-type & is-published
             if ( empty( $ids ) ) { return; }
             $wp_query_args += [ 'post__in' => $ids, 'orderby' => 'post__in' ];
         break;
         case ( 'query' ):
             $query = $metas[ FCPPBK_PREF.'query' ];
             if ( trim( $query ) === '' ) { return; }
-            $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC', 's' => $query ]; // ++should I sanitize the $query?
+            $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC', 's' => $query ];
         break;
         default:
             return;
@@ -443,11 +407,11 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
     return '<section class="'.FCPPBK_SLUG.' container"><h2>'.$atts['headline'].'</h2><div>' . implode( '', $result) . '</div></section>';
 });
 
-// all ++ refactor and filters
 // ++admin
-// ++polish for bublishing
+// ++polish for publishing
     // excape everything before printing
 // ++add a global function to print?
+// ++option to print automatically?
 // ++is it allowed to make the gutenberg block??
 // ++check the plugins on reis - what minifies the jss?
 // ++array_unique before saving.. just so is
