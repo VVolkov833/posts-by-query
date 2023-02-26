@@ -33,7 +33,7 @@ add_action( 'add_meta_boxes', function() {
     add_meta_box(
         'fcp-posts-by-query',
         'Posts by Query',
-        'FCP\PostsByQuery\metabox_query',
+        __NAMESPACE__.'\metabox_query',
         array_keys( $public_post_types ),
         'normal',
         'low'
@@ -128,7 +128,7 @@ add_action( 'rest_api_init', function () {
                     'validate_callback' => function($param) {
                         return trim( $param ) ? true : false;
                     },
-                    'sanitize_callback' => function($param, $request, $key) {
+                    'sanitize_settings' => function($param, $request, $key) {
                         return sanitize_text_field( urldecode( $param ) ); // return htmlspecialchars( wp_unslash( urldecode( $param ) ) );
                     },
                 ],
@@ -148,7 +148,7 @@ function metabox_query() {
     <div class="<?php echo esc_attr( FCPPBK_PREF ) ?>tabs">
         <?php
         radiobox( (object) [
-            'name' => 'variants',
+            'name' => FCPPBK_PREF.'variants',
             'value' => 'query',
             'checked' => get_post_meta( $post->ID, FCPPBK_PREF.'variants' )[0],
             'default' => true,
@@ -157,8 +157,8 @@ function metabox_query() {
         <div>
             <p><strong>Posts by Search Query &amp; Date</strong></p>
             <?php
-            input( (object) [
-                'name' => 'query',
+            text( (object) [
+                'name' => FCPPBK_PREF.'query',
                 'placeholder' => 'search query',
                 'value' => get_post_meta( $post->ID, FCPPBK_PREF.'query' )[0],
             ]);
@@ -167,7 +167,7 @@ function metabox_query() {
 
         <?php
         radiobox( (object) [
-            'name' => 'variants',
+            'name' => FCPPBK_PREF.'variants',
             'value' => 'list',
             'checked' => get_post_meta( $post->ID, FCPPBK_PREF.'variants' )[0],
         ]);
@@ -175,8 +175,8 @@ function metabox_query() {
         <div>
             <p><strong>Particular Posts</strong></p>
             <?php
-            input( (object) [
-                'name' => 'list',
+            text( (object) [
+                'name' => FCPPBK_PREF.'list',
                 'placeholder' => 'search query',
                 'value' => get_post_meta( $post->ID, FCPPBK_PREF.'list' )[0],
             ]);
@@ -205,7 +205,7 @@ function metabox_query() {
         }
 
         checkboxes( (object) [
-            'name' => 'posts',
+            'name' => FCPPBK_PREF.'posts',
             'options' => $result,
             'value' => $ids,
         ]);
@@ -219,48 +219,6 @@ function metabox_query() {
     <?php
 }
 
-function input($a) {
-    ?>
-    <input type="text"
-        name="<?php echo esc_attr( FCPPBK_PREF . $a->name ) ?>"
-        id="<?php echo esc_attr( FCPPBK_PREF . $a->name ) ?>"
-        placeholder="<?php echo isset( $a->placeholder ) ? esc_attr( $a->placeholder )  : '' ?>"
-        value="<?php echo isset( $a->value ) ? esc_attr( $a->value ) : '' ?>"
-        class="<?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
-    />
-    <?php
-}
-function checkboxes($a) {
-    ?>
-    <fieldset
-        id="<?php echo esc_attr( FCPPBK_PREF . $a->name ) ?>"
-        class="<?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
-    >
-    <?php foreach ( $a->options as $k => $v ) { ?>
-        <?php $checked = is_array( $a->value ) && in_array( $k, $a->value ) ?>
-        <label>
-            <input type="checkbox"
-                name="<?php echo esc_attr( FCPPBK_PREF . $a->name ) ?>[]"
-                value="<?php echo esc_attr( $k ) ?>"
-                <?php echo esc_attr( $checked ? 'checked' : '' ) ?>
-            >
-            <span><?php echo esc_html( $v ) ?></span>
-        </label>
-    <?php } ?>
-    </fieldset>
-    <?php
-}
-function radiobox($a) {
-    static $checked = false;
-    $checked = $checked ? true : $a->checked === $a->value;
-    ?>
-    <input type="radio"
-        name="<?php echo esc_attr( FCPPBK_PREF . $a->name ) ?>"
-        value="<?php echo esc_attr( $a->value ) ?>"
-        <?php echo esc_attr( ( $a->checked === $a->value || $a->default && !$checked ) ? 'checked' : '' ) ?>
-    >
-    <?php
-}
 
 function get_all_post_types() {
     static $all = [], $public = [], $archive = [];
@@ -407,12 +365,332 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
     return '<section class="'.FCPPBK_SLUG.' container"><h2>'.$atts['headline'].'</h2><div>' . implode( '', $result) . '</div></section>';
 });
 
+
+// settings page
+add_action( 'admin_menu', function() {
+	add_options_page( 'Posts by Queryuery settings', 'Posts by Queryuery', 'switch_themes', 'posts-by-query', __NAMESPACE__.'\settings_print' );
+});
+
+function settings_print(){
+	?>
+	<div class="wrap">
+		<h2><?php echo get_admin_page_title() ?></h2>
+
+		<form action="options.php" method="POST">
+			<?php
+				do_settings_sections( FCPPBK_PREF.'settings-page' ); // print fields of the page / tab
+				submit_button();
+                settings_fields( FCPPBK_PREF.'settings-group1' ); // nonce
+			?>
+		</form>
+	</div>
+	<?php
+}
+
+add_action( 'admin_init', function() {
+
+    $settings = (object) [
+        'page' => FCPPBK_PREF.'settings-page',
+        'section' => 'styling-settings',
+        'varname' => FCPPBK_PREF.'settings',
+    ];
+    $settings->values = get_option( $settings->varname );
+
+    $title2slug = function($a) {
+        return sanitize_title( $a );
+    };
+    $asd = function( $title, $type = '', $atts = [] ) use ( $settings, $title2slug ) { // $atts: placeholder, options
+
+        $type = empty( $type ) ? 'text' : $type; //++in array of existing functions
+        $slug = empty( $atts['slug'] ) ? $title2slug( $title ) : $atts['slug'];
+
+        $attributes = (object) [
+            'name' => $settings->varname.'['.$slug.']',
+            'id' => $settings->varname . '--' . $slug,
+            'value' => $settings->values[ $slug ],
+            'placeholder' => empty( $atts['placeholder'] ) ? '' : $atts['placeholder'],
+            'options' => empty( $atts['options'] ) ? '' : $atts['options'],
+        ];
+
+        add_settings_field(
+            $slug,
+            $title,
+            function() use ( $attributes ) {
+                text( $attributes );
+            },
+            $settings->page,
+            $settings->section
+        );
+    };
+
+
+    // structure of fields
+	add_settings_section( $settings->section, 'Styling', '', $settings->page );
+        $asd( 'Read-more text', 'text' );
+        $asd( 'Read-more text 1', 'text1' );
+/*
+	    add_settings_field( 'main-color', 'Main color', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
+        add_settings_field( 'secondary-color', 'Secondary color', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
+        add_settings_field( 'layout', 'Layout', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
+        add_settings_field( 'thumbnail-size', 'Thumbnail size', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
+        add_settings_field( 'show-date', 'Show date', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
+        add_settings_field( 'show-excerpt', 'Show excerpt', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
+            add_settings_field( 'excerpt-length', 'Excerpt-length', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
+        add_settings_field( 'show-readmore', 'Show the Read-more button', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
+            add_settings_field( 'readmore-text', 'Read-more button text', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
+        add_settings_field( 'show-category', 'Show main category', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
+
+	add_settings_section( 'other-settings', 'Other Settings', '', FCPPBK_PREF.'settings-page' );
+	    add_settings_field( 'apply-to', 'Post types to apply to', function()use($val){}, FCPPBK_PREF.'settings-page', 'other-settings' );
+	    add_settings_field( 'select-from', 'Post types to search from', function()use($val){}, FCPPBK_PREF.'settings-page', 'other-settings' );
+        add_settings_field( 'defer-style', 'Defer the style loading', function()use($val){}, FCPPBK_PREF.'settings-page', 'other-settings' );
+//*/
+
+/* admin
+    Apply to:
+        post types to apply the meta
+        post types to grab the titles
+
+    Style:
+        main color
+        secondary color
+        show excerpt
+        show date
+        show button
+            button text
+        show main category
+        show the image / size
+        excerpt length
+        layout
+            x3-v1
+            x3-v2
+            x2+list
+            list
+    Preview
+
+    SEO:
+        defer styles checkbox
+
+    Later:
+    only admin checkbox (or anyone, who can edit the post)
+    get the first image if no featured
+    tiles per row
+*/
+    register_setting( FCPPBK_PREF.'settings-group1', $settings->varname, __NAMESPACE__.'\sanitize_settings' ); // register, save, nonce
+});
+
+function text($a) {
+    ?>
+    <input type="text"
+        name="<?php echo esc_attr( $a->name ) ?>"
+        id="<?php echo esc_attr( isset( $a->id ) ? $a->id : $a->name ) ?>"
+        placeholder="<?php echo isset( $a->placeholder ) ? esc_attr( $a->placeholder )  : '' ?>"
+        value="<?php echo isset( $a->value ) ? esc_attr( $a->value ) : '' ?>"
+        class="<?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
+    />
+    <?php
+}
+function checkboxes($a) {
+    ?>
+    <fieldset
+        id="<?php echo esc_attr( isset( $a->id ) ? $a->id : $a->name ) ?>"
+        class="<?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
+    >
+    <?php foreach ( $a->options as $k => $v ) { ?>
+        <?php $checked = is_array( $a->value ) && in_array( $k, $a->value ) ?>
+        <label>
+            <input type="checkbox"
+                name="<?php echo esc_attr( $a->name ) ?>[]"
+                value="<?php echo esc_attr( $k ) ?>"
+                <?php echo esc_attr( $checked ? 'checked' : '' ) ?>
+            >
+            <span><?php echo esc_html( $v ) ?></span>
+        </label>
+    <?php } ?>
+    </fieldset>
+    <?php
+}
+function radiobox($a) {
+    static $checked = false;
+    $checked = $checked ? true : $a->checked === $a->value;
+    ?>
+    <input type="radio"
+        name="<?php echo esc_attr( $a->name ) ?>"
+        value="<?php echo esc_attr( $a->value ) ?>"
+        <?php echo esc_attr( ( $a->checked === $a->value || $a->default && !$checked ) ? 'checked' : '' ) ?>
+    >
+    <?php
+}
+
+// Заполняем опцию 1
+function fill_primer_field1(){
+
+	$val = get_option(FCPPBK_PREF.'settings');
+	$val = $val ? $val['input'] : null;
+	?>
+	<input type="text" name="<?php echo FCPPBK_PREF.'settings' ?>[input]" value="<?php echo esc_attr( $val ) ?>" />
+	<?php
+}
+
+// Заполняем опцию 2
+function fill_primer_field2(){
+
+	$val = get_option(FCPPBK_PREF.'settings');
+	$val = $val ? $val['checkbox'] : null;
+	?>
+	<label><input type="checkbox" name="<?php echo FCPPBK_PREF.'settings' ?>[checkbox]" value="1" <?php checked( 1, $val ) ?> /> отметить</label>
+	<?php
+}
+
+// Очистка данных
+function sanitize_settings( $options ){
+
+	foreach( $options as $name => & $val ){
+		if( $name == 'input' )
+			$val = strip_tags( $val );
+
+		if( $name == 'checkbox' )
+			$val = intval( $val );
+	}
+
+	//die(print_r( $options )); // Array ( [input] => aaaa [checkbox] => 1 )
+
+	return $options;
+}
+
+
+// the plugin settings page
+/*
+add_action( 'admin_menu', function () {
+	add_submenu_page( 'options-general.php', 'Posts by Queryuery settings', 'Posts by Queryuery', 'switch_themes', 'posts-by-query', 'FCP\PostsByQuery\settings_page', 'dashicons-clipboard', 99 );
+} );
+
+function settings_page() {
+    ?>
+	<form method="post" action="options.php">
+
+		<?php settings_fields( 'theme-fields' ); ?><br />
+		
+		<h3>Footer fields:</h3>
+
+		<?php do_settings_sections( 'theme-work-hours' ); ?>
+		<?php do_settings_sections( 'theme-additional-info' ); ?>
+
+		<div class="theme-inputs">
+			<p>
+				<span class="theme-iconed">#</span> <input type="text" name="theme-work-hours" value="<?php echo get_option( 'theme-work-hours' ); ?>"/>
+			</p>
+			<p>
+				<span class="theme-iconed">!</span> <input type="text" name="theme-additional-info" value="<?php echo get_option( 'theme-additional-info' ); ?>"/>
+			</p>
+		</div>
+
+		<?php submit_button(); ?>
+	</form>
+
+	<div class="wrap">
+		<h2><?php echo get_admin_page_title() ?></h2>
+
+		<?php
+		// settings_errors() не срабатывает автоматом на страницах отличных от опций
+		if( get_current_screen()->parent_base !== 'options-general' )
+			settings_errors('название_опции');
+		?>
+
+		<form action="options.php" method="POST">
+			<?php
+				settings_fields("opt_group");     // скрытые защитные поля
+				do_settings_sections("opt_page"); // секции с настройками (опциями).
+				submit_button();
+			?>
+		</form>
+	</div>
+
+    <?php
+}
+
+/*
+// adding theme settings
+function theme_settings_menu() {
+	$page_title = 'Common settings';
+	$menu_title = 'Common';
+	$capability = 'edit_pages';
+	$menu_slug  = 'theme-settings';
+	$function   = 'theme_settings_page';
+	$icon_url   = 'dashicons-clipboard';
+	$position   = 2;
+	add_menu_page( $page_title, $menu_title, $capability, $menu_slug, $function, $icon_url, $position );
+}
+add_action( 'admin_menu', 'theme_settings_menu' );
+
+
+function theme_settings_page() {
+	theme_clear_cache();
+    // ++can use example from here https://wp-kama.ru/function/add_menu_page
+?>
+	<h1>Common Settings</h1>
+	
+	<form method="post" action="options.php" class="theme-form">
+		<?php settings_fields( 'theme-fields' ); ?><br />
+		
+		<h3>Footer fields:</h3>
+		<?php do_settings_sections( 'theme-work-hours' ); ?>
+		<?php do_settings_sections( 'theme-additional-info' ); ?>
+		<div class="theme-inputs">
+			<p>
+				<span class="theme-iconed">#</span> <input type="text" name="theme-work-hours" value="<?php echo get_option( 'theme-work-hours' ); ?>"/>
+			</p>
+			<p>
+				<span class="theme-iconed">!</span> <input type="text" name="theme-additional-info" value="<?php echo get_option( 'theme-additional-info' ); ?>"/>
+			</p>
+		</div>
+
+		<?php submit_button(); ?>
+	</form>
+
+	<style>
+		.theme-inputs > p {
+			display:flex;
+			align-items:center;
+			font-size:20px;
+		}
+		.theme-inputs > p > span {
+			margin-right:10px;
+		}
+		.theme-inputs > p > input {
+			flex:1;
+		}
+		@font-face {
+		  font-family: 'Icons';
+		  src: url('<?php echo get_template_directory_uri(); ?>/fonts/icons.eot');
+		  src: url('<?php echo get_template_directory_uri(); ?>/fonts/icons.woff2') format('woff2'),
+			   url('<?php echo get_template_directory_uri(); ?>/fonts/icons.eot?#iefix') format('embedded-opentype');
+		}
+		.theme-iconed {
+			font-family:Icons;
+		}
+	</style>
+<?php
+}
+
+function theme_settings_page_capability( $capability ) {
+	return 'edit_pages';
+}
+add_filter( 'option_page_capability_'.'theme-fields', 'theme_settings_page_capability' );
+
+function theme_settings_save() {
+	register_setting( 'theme-fields', 'theme-work-hours' );
+	register_setting( 'theme-fields', 'theme-additional-info' );
+}
+add_action( 'admin_init', 'theme_settings_save' );
+*/
+
 // ++admin
 // ++polish for publishing
     // excape everything before printing
 // ++add a global function to print?
 // ++option to print automatically?
-// ++is it allowed to make the gutenberg block??
+    // ++is it allowed to make the gutenberg block??
 // ++check the plugins on reis - what minifies the jss?
 // ++array_unique before saving.. just so is
 // ++2 more styles? check the todo
@@ -441,5 +719,6 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
     only admin checkbox (or anyone, who can edit the post)
     preview
     get the first image if no featured
+    read-more text ++ translation
 */
 // ++ drag and drop to change the order of particular posts
