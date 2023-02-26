@@ -147,7 +147,7 @@ function metabox_query() {
     ?>
     <div class="<?php echo esc_attr( FCPPBK_PREF ) ?>tabs">
         <?php
-        radiobox( (object) [
+        radio( (object) [
             'name' => FCPPBK_PREF.'variants',
             'value' => 'query',
             'checked' => get_post_meta( $post->ID, FCPPBK_PREF.'variants' )[0],
@@ -166,7 +166,7 @@ function metabox_query() {
         </div>
 
         <?php
-        radiobox( (object) [
+        radio( (object) [
             'name' => FCPPBK_PREF.'variants',
             'value' => 'list',
             'checked' => get_post_meta( $post->ID, FCPPBK_PREF.'variants' )[0],
@@ -334,7 +334,7 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
 
     $result = [];
     while ( $search->have_posts() ) {
-        //$search->the_post(); // fails somehow
+        //$search->the_post(); // has the conflict with Glossary (Premium) plugin, which flushes the first post in a loop to the root one with the_excerpt()
         $p = $search->next_post();
         $excerpt = substr( get_the_excerpt( $p ), 0, 186 ); // ++value or 0
         $excerpt = rtrim( substr( $excerpt, 0, strrpos( $excerpt, ' ' ) ), ',.…!?&([{-_ "„“' ) . '…';
@@ -368,70 +368,84 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
 
 // settings page
 add_action( 'admin_menu', function() {
-	add_options_page( 'Posts by Queryuery settings', 'Posts by Queryuery', 'switch_themes', 'posts-by-query', __NAMESPACE__.'\settings_print' );
+    // capabilities filter is inside
+	add_options_page( 'Posts by Queryuery settings', 'Posts by Queryuery', 'switch_themes', 'posts-by-query', function() {
+        ?>
+        <div class="wrap">
+            <h2><?php echo get_admin_page_title() ?></h2>
+    
+            <form action="options.php" method="POST">
+                <?php
+                    do_settings_sections( FCPPBK_PREF.'settings-page' ); // print fields of the page / tab
+                    submit_button();
+                    settings_fields( FCPPBK_PREF.'settings-group1' ); // nonce
+                ?>
+            </form>
+        </div>
+        <?php
+    });
 });
-
-function settings_print(){
-	?>
-	<div class="wrap">
-		<h2><?php echo get_admin_page_title() ?></h2>
-
-		<form action="options.php" method="POST">
-			<?php
-				do_settings_sections( FCPPBK_PREF.'settings-page' ); // print fields of the page / tab
-				submit_button();
-                settings_fields( FCPPBK_PREF.'settings-group1' ); // nonce
-			?>
-		</form>
-	</div>
-	<?php
-}
 
 add_action( 'admin_init', function() {
 
+    // ++filter for admin & screen
+
     $settings = (object) [
         'page' => FCPPBK_PREF.'settings-page',
-        'section' => 'styling-settings',
         'varname' => FCPPBK_PREF.'settings',
     ];
     $settings->values = get_option( $settings->varname );
+    // $settings->section goes later
 
-    $title2slug = function($a) {
-        return sanitize_title( $a );
-    };
-    $asd = function( $title, $type = '', $atts = [] ) use ( $settings, $title2slug ) { // $atts: placeholder, options
+    $add_settings_field = function( $title, $type = '', $atts = [] ) use ( $settings ) { // $atts: placeholder, options, step
 
-        $type = empty( $type ) ? 'text' : $type; //++in array of existing functions
-        $slug = empty( $atts['slug'] ) ? $title2slug( $title ) : $atts['slug'];
+        $types = [ 'text', 'radio', 'checkbox', 'checkboxes', 'select', 'color' ];
+        $type = ( empty( $type ) || !in_array( $type, $types ) ) ? $types[0] : $type;
+        $function = __NAMESPACE__.'\\'.$type;
+        if ( !function_exists( $function ) ) { return; }
+        $slug = empty( $atts['slug'] ) ? sanitize_title( $title ) : $atts['slug'];
 
         $attributes = (object) [
             'name' => $settings->varname.'['.$slug.']',
             'id' => $settings->varname . '--' . $slug,
             'value' => $settings->values[ $slug ],
             'placeholder' => empty( $atts['placeholder'] ) ? '' : $atts['placeholder'],
-            'options' => empty( $atts['options'] ) ? '' : $atts['options'],
+            'options' => empty( $atts['options'] ) ? '' : $atts['options']
         ];
 
         add_settings_field(
             $slug,
             $title,
-            function() use ( $attributes ) {
-                text( $attributes );
+            function() use ( $attributes, $function ) {
+                call_user_func( $function, $attributes );
             },
             $settings->page,
             $settings->section
         );
     };
 
+    $layout_options = [ '2 columns', '3 columns', 'List', '2 columns + 1 list' ];
+    $layout_options = array_reduce( $layout_options, function( $result, $item ) {
+        $result[ sanitize_title( $item ) ] = $item;
+        return $result;
+    }, [] );
 
     // structure of fields
+    $settings->section = 'styling-settings';
 	add_settings_section( $settings->section, 'Styling', '', $settings->page );
-        $asd( 'Read-more text', 'text' );
-        $asd( 'Read-more text 1', 'text1' );
+        $add_settings_field( 'Main color', 'color' ); // ++use wp default picker
+        $add_settings_field( 'Secondary color', 'color' );
+        $add_settings_field( 'Layout', 'select', [ 'options' => $layout_options ] );
+        $add_settings_field( 'Limit the list', 'number', [ 'placeholder' => 10, 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ] );
+
+    $settings->section = 'other-settings';
+    add_settings_section( $settings->section, 'Styling1', '', $settings->page );
+        $add_settings_field( 'Read-more text 1', 'text1' );
 /*
 	    add_settings_field( 'main-color', 'Main color', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
         add_settings_field( 'secondary-color', 'Secondary color', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
         add_settings_field( 'layout', 'Layout', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
+        add_settings_field( 'limit-list', 'Limit list', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
         add_settings_field( 'thumbnail-size', 'Thumbnail size', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
         add_settings_field( 'show-date', 'Show date', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
         add_settings_field( 'show-excerpt', 'Show excerpt', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
@@ -490,6 +504,32 @@ function text($a) {
     />
     <?php
 }
+function color($a) {
+    ?>
+    <input type="color"
+        name="<?php echo esc_attr( $a->name ) ?>"
+        id="<?php echo esc_attr( isset( $a->id ) ? $a->id : $a->name ) ?>"
+        placeholder="<?php echo isset( $a->placeholder ) ? esc_attr( $a->placeholder )  : '' ?>"
+        value="<?php echo isset( $a->value ) ? esc_attr( $a->value ) : '' ?>"
+        class="color-picker <?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
+    />
+    <?php
+}
+function select($a) {
+    ?>
+    <select
+        name="<?php echo esc_attr( $a->name ) ?>"
+        id="<?php echo esc_attr( isset( $a->id ) ? $a->id : $a->name ) ?>"
+        class="<?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
+    >
+    <?php foreach ( $a->options as $k => $v ) { ?>
+        <option value="<?php echo esc_attr( $k ) ?>"
+            <?php selected( !empty( $a->value ) && $k === $a->value, true ) ?>
+        ><?php echo esc_html( $v ) ?></option>
+    <?php } ?>
+    </select>
+    <?php
+}
 function checkboxes($a) {
     ?>
     <fieldset
@@ -497,12 +537,11 @@ function checkboxes($a) {
         class="<?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
     >
     <?php foreach ( $a->options as $k => $v ) { ?>
-        <?php $checked = is_array( $a->value ) && in_array( $k, $a->value ) ?>
         <label>
             <input type="checkbox"
                 name="<?php echo esc_attr( $a->name ) ?>[]"
                 value="<?php echo esc_attr( $k ) ?>"
-                <?php echo esc_attr( $checked ? 'checked' : '' ) ?>
+                <?php checked( is_array( $a->value ) && in_array( $k, $a->value ), true ) ?>
             >
             <span><?php echo esc_html( $v ) ?></span>
         </label>
@@ -510,7 +549,7 @@ function checkboxes($a) {
     </fieldset>
     <?php
 }
-function radiobox($a) {
+function radio($a) {
     static $checked = false;
     $checked = $checked ? true : $a->checked === $a->value;
     ?>
@@ -720,5 +759,7 @@ add_action( 'admin_init', 'theme_settings_save' );
     preview
     get the first image if no featured
     read-more text ++ translation
+
 */
 // ++ drag and drop to change the order of particular posts
+// ++ use wp checked()
