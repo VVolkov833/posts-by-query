@@ -39,22 +39,29 @@ add_action( 'add_meta_boxes', function() {
         'low'
     );
 });
-// style meta boxes
+// style meta boxes && settings
 add_action( 'admin_enqueue_scripts', function() {
 
     if ( !current_user_can( 'administrator' ) ) { return; }
+    $files = [ 'post' => [ 'metabox', 'advisor' ], 'settings_page_posts-by-query' => [ 'settings' ] ];
     $screen = get_current_screen();
-    if ( !isset( $screen ) || !is_object( $screen ) || !in_array( $screen->base, [ 'post' ] ) ) { return; }
+    if ( !isset( $screen ) || !is_object( $screen ) || !isset( $files[ $screen->base ] ) ) { return; }
 
     $assets_path = __DIR__.'/assets';
-
     foreach ( scandir( $assets_path ) as $v ) {
         if ( !is_file( $assets_path.'/'.$v ) ) { continue; }
+        $onthelist = array_reduce( $files[ $screen->base ], function( $result, $item ) use ( $v ) {
+            $result = $result ? $result : strpos( $v, $item.'.' ) === 0;
+            return $result;
+        });
+        if ( !$onthelist ) { continue; }
+
         $ext = substr( $v, strrpos( $v, '.' )+1 );
-        $name = FCPPBK_PREF.preg_replace( ['/\.(?:js|css)$/', '/[^a-z0-9\-_]/'], '', $v );
+        $handle = FCPPBK_PREF.preg_replace( ['/\.(?:js|css)$/', '/[^a-z0-9\-_]/'], '', $v );
         $url = plugin_dir_url(__FILE__).'assets/'.$v;
-        if ( $ext === 'css' ) { wp_enqueue_style( $name, $url, [], FCPPBK_VER, 'all' ); }
-        if ( $ext === 'js' ) { wp_enqueue_script( $name, $url, [], FCPPBK_VER, false ); }
+
+        if ( $ext === 'css' ) { wp_enqueue_style( $handle, $url, [], FCPPBK_VER, 'all' ); }
+        if ( $ext === 'js' ) { wp_enqueue_script( $handle, $url, [], FCPPBK_VER, false ); }
     }
 
 });
@@ -236,7 +243,6 @@ function get_all_post_types() {
             $archive[ $type->name ] = $type->label;
         }
         if ( $type->public ) {
-            if ( $type->name === 'page' ) { $type->label .= ' (except Front Page)'; }
             $public[ $type->name ] = $type->label;
         }
     }
@@ -330,30 +336,74 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
 
     if ( !$search->have_posts() ) { return; }
 
-    $template = file_get_contents( __DIR__ . '/templates/' . $atts['layout'] . '.html' );
+    $template = function($name) {
+        static $cached = [];
+        if ( isset( $cached[ $name ] ) ) { return $cached[ $name ]; }
+        $template = file_get_contents( __DIR__.'/templates/'.$name.'.html' );
+        if ( $template === false ) { return; }
+        $cached[ $name ] = $template;
+        return $cached[ $name ];
+    };
+    $format = function($params, $template_name) use ($template) { // ++refactor
+        return strtr( $template( $template_name ), array_reduce( array_keys( $params ), function( $result, $item ) use ( $params ) {
+            $result[ '%'.$item ] = $params[ $item ];
+            return $result;
+        }, [] ) );
+    };
+    $params = [];
+    $param_add = function( $key, $fill = true ) use ( $format, &$params ) { //++$key, $fill (condition, which gotta be true and fill empty if is false)
+        $add = function($key) use ($format, &$params, $fill) { $params[ $key ] = $fill ? $format( $params, $key ) : ''; };
+        if ( is_array( $key ) ) {
+            foreach( $key as $v ) { $add( $v ); }
+            return;
+        }
+        $add( $key );
+    };
+    $crop_excerpt = function($text, $length) {
+        if ( !$text || !is_numeric( $settings['excerpt-length'] ) ) { return $text; }
+        $text = substr( get_the_excerpt( $p ), 0, $length );
+        $text = rtrim( substr( $text, 0, strrpos( $text, ' ' ) ), ',.…!?&([{-_ "„“' ) . '…';
+        return $text;
+    };
+
+    $settings = get_option( FCPPBK_PREF.'settings' );
 
     $result = [];
     while ( $search->have_posts() ) {
         //$search->the_post(); // has the conflict with Glossary (Premium) plugin, which flushes the first post in a loop to the root one with the_excerpt()
         $p = $search->next_post();
-        $excerpt = substr( get_the_excerpt( $p ), 0, 186 ); // ++value or 0
-        $excerpt = rtrim( substr( $excerpt, 0, strrpos( $excerpt, ' ' ) ), ',.…!?&([{-_ "„“' ) . '…';
-        $result[] = strtr( $template, [
-            '%id' => get_the_ID( $p ),
-            '%permalink' => get_permalink( $p ),
-            '%title' => get_the_title( $p ),
-            '%title_linked' => get_the_title( $p ),
-            '%excerpt' => $excerpt,
 
-            '%thumbnail' => get_the_post_thumbnail( $p, 'medium' ), // ++condition
-            '%thumbnail_linked' => '', // ++condition
-            '%date' => get_the_date( '', $p ), // ++format here && condition
-            '%button' => '', // ++format here && condition
-            '%category' => '', // ++format here && condition
-        ]);
+        $categories = $settings['hide-category'] ? '' : get_the_category( $p );
+//++ add filters like esc_url and esc_html
+        $params = [
+            'id' => get_the_ID( $p ),
+            'permalink' => get_permalink( $p ),
+            'title' => get_the_title( $p ),
+            'date' => $settings['hide-date'] ? '' : get_the_date( '', $p ),
+            'excerpt' => $settings['hide-excerpt'] ? '' : get_the_excerpt( $p ),
+            'category' => empty( $categories ) ? '' : $categories[0]->name,
+            'category_link' => empty( $categories ) ? '' : get_category_link( $categories[0]->term_id ),
+            'thumbnail' => $settings['thumbnail-size'] ? get_the_post_thumbnail( $p, $settings['thumbnail-size'] ) : '',
+            'readmore' => __( $settings['read-more-text'] ? $settings['read-more-text'] : 'Read more' ),
+        ];
+        $param_add( 'title_linked' );
+        $param_add( 'date', $params['date'] );
+        $params['excerpt'] = $crop_excerpt( $params['excerpt'], $settings['excerpt-length'] );
+        $param_add( 'excerpt', $params['excerpt'] );
+        $param_add( 'category_linked', $params['category'] && $params['category_link'] );
+        $param_add( 'thumbnail_linked', $params['thumbnail'] );
+        $param_add( 'button', !$settings['hide-read-more'] );
+
+        ksort( $params, SORT_STRING ); // ++ end with % instead of probability??
+        $result[] = $format( $params, 'column' );
+        //echo '<pre>';
+        //print_r( [ $settings, $params ] ); exit;
+
     }
 
     //wp_reset_postdata();
+
+//print_r( $result ); exit;
 
     wp_enqueue_style(
         'fcp-posts-by-query',
@@ -397,9 +447,9 @@ add_action( 'admin_init', function() {
     $settings->values = get_option( $settings->varname );
     // $settings->section goes later
 
-    $add_settings_field = function( $title, $type = '', $atts = [] ) use ( $settings ) { // $atts: placeholder, options, step
+    $add_settings_field = function( $title, $type = '', $atts = [] ) use ( $settings ) { // $atts: placeholder, options, option, step
 
-        $types = [ 'text', 'radio', 'checkbox', 'checkboxes', 'select', 'color' ];
+        $types = [ 'text', 'radio', 'checkbox', 'checkboxes', 'select', 'color', 'number', 'comment' ];
         $type = ( empty( $type ) || !in_array( $type, $types ) ) ? $types[0] : $type;
         $function = __NAMESPACE__.'\\'.$type;
         if ( !function_exists( $function ) ) { return; }
@@ -409,8 +459,11 @@ add_action( 'admin_init', function() {
             'name' => $settings->varname.'['.$slug.']',
             'id' => $settings->varname . '--' . $slug,
             'value' => $settings->values[ $slug ],
-            'placeholder' => empty( $atts['placeholder'] ) ? '' : $atts['placeholder'],
-            'options' => empty( $atts['options'] ) ? '' : $atts['options']
+            'placeholder' => empty( $atts['placeholder'] ) ? '' : $atts['placeholder'], // ++unify with the rest
+            'options' => empty( $atts['options'] ) ? '' : $atts['options'],
+            'option' => empty( $atts['option'] ) ? '' : $atts['option'],
+            'label' => empty( $atts['label'] ) ? '' : $atts['label'],
+            'comment' => empty( $atts['comment'] ) ? '' : $atts['comment'],
         ];
 
         add_settings_field(
@@ -430,91 +483,65 @@ add_action( 'admin_init', function() {
         return $result;
     }, [] );
 
+    $thumbnail_sizes = wp_get_registered_image_subsizes(); //++full, ++no image
+    $thumbnail_sizes = [ '' => 'No image', 'full' => 'Full' ] + array_reduce( array_keys( $thumbnail_sizes ), function( $result, $item ) use ( $thumbnail_sizes ) {
+        $result[ $item ] = ucfirst( $item ) . ' ('.$thumbnail_sizes[$item]['width'].'x'.$thumbnail_sizes[$item]['height'].')';
+        return $result;
+    }, [] );
+
+    list( 'public' => $public_post_types ) = get_all_post_types();
+
     // structure of fields
+    $settings->section = 'description';
+	add_settings_section( $settings->section, 'Description', '', $settings->page );
+        $add_settings_field( '', 'comment', [ 'comment' => '<p>Add the posts section with the following shortcode <code>['.FCPPBK_SLUG.']</code></p>' ] );
+
     $settings->section = 'styling-settings';
-	add_settings_section( $settings->section, 'Styling', '', $settings->page );
+	add_settings_section( $settings->section, 'Styling settings', '', $settings->page );
         $add_settings_field( 'Main color', 'color' ); // ++use wp default picker
         $add_settings_field( 'Secondary color', 'color' );
         $add_settings_field( 'Layout', 'select', [ 'options' => $layout_options ] );
-        $add_settings_field( 'Limit the list', 'number', [ 'placeholder' => 10, 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ] );
+        $add_settings_field( 'Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ] ); // ++ make the comment work
+        $add_settings_field( 'Thumbnail size', 'select', [ 'options' => $thumbnail_sizes ] );
+        $add_settings_field( 'Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols' ] );
+        $add_settings_field( '"Read more" text', 'text', [ 'placeholder' => __( 'Read more' ) ] );
+
+    $settings->section = 'hide-details';
+    add_settings_section( $settings->section, 'Hide details', '', $settings->page );
+        $add_settings_field( '', 'checkbox', [ 'option' => '1', 'label' => 'Hide the date', 'slug' => 'hide-date' ] );
+        $add_settings_field( '', 'checkbox', [ 'option' => '1', 'label' => 'Hide the excerpt', 'slug' => 'hide-excerpt' ] );
+        $add_settings_field( '', 'checkbox', [ 'option' => '1', 'label' => 'Hide the category', 'slug' => 'hide-category' ] );
+        $add_settings_field( '', 'checkbox', [ 'option' => '1', 'label' => 'Hide the "'.__('Read more').'" button', 'slug' => 'hide-read-more' ] );
 
     $settings->section = 'other-settings';
-    add_settings_section( $settings->section, 'Styling1', '', $settings->page );
-        $add_settings_field( 'Read-more text 1', 'text1' );
-/*
-	    add_settings_field( 'main-color', 'Main color', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
-        add_settings_field( 'secondary-color', 'Secondary color', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
-        add_settings_field( 'layout', 'Layout', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
-        add_settings_field( 'limit-list', 'Limit list', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
-        add_settings_field( 'thumbnail-size', 'Thumbnail size', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
-        add_settings_field( 'show-date', 'Show date', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
-        add_settings_field( 'show-excerpt', 'Show excerpt', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
-            add_settings_field( 'excerpt-length', 'Excerpt-length', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
-        add_settings_field( 'show-readmore', 'Show the Read-more button', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
-            add_settings_field( 'readmore-text', 'Read-more button text', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
-        add_settings_field( 'show-category', 'Show main category', function()use($val){}, FCPPBK_PREF.'settings-page', 'styling-settings' );
+    add_settings_section( $settings->section, 'Other settings', '', $settings->page );
+        $add_settings_field( 'Select from', 'checkboxes', [ 'options' => $public_post_types ] );
+        $add_settings_field( 'Apply to', 'checkboxes', [ 'options' => $public_post_types, 'comment' => 'This will add the option to query the posts to selected post types editor bottom' ] );
+        $add_settings_field( 'Defer style', 'checkbox', [ 'option' => '1', 'label' => 'defer the render blocking style.css', 'comment' => 'If you use a caching plugin, most probably it fulfulls the role of this checkbox' ] );
 
-	add_settings_section( 'other-settings', 'Other Settings', '', FCPPBK_PREF.'settings-page' );
-	    add_settings_field( 'apply-to', 'Post types to apply to', function()use($val){}, FCPPBK_PREF.'settings-page', 'other-settings' );
-	    add_settings_field( 'select-from', 'Post types to search from', function()use($val){}, FCPPBK_PREF.'settings-page', 'other-settings' );
-        add_settings_field( 'defer-style', 'Defer the style loading', function()use($val){}, FCPPBK_PREF.'settings-page', 'other-settings' );
-//*/
-
-/* admin
-    Apply to:
-        post types to apply the meta
-        post types to grab the titles
-
-    Style:
-        main color
-        secondary color
-        show excerpt
-        show date
-        show button
-            button text
-        show main category
-        show the image / size
-        excerpt length
-        layout
-            x3-v1
-            x3-v2
-            x2+list
-            list
-    Preview
-
-    SEO:
-        defer styles checkbox
-
-    Later:
-    only admin checkbox (or anyone, who can edit the post)
-    get the first image if no featured
-    tiles per row
-*/
     register_setting( FCPPBK_PREF.'settings-group1', $settings->varname, __NAMESPACE__.'\sanitize_settings' ); // register, save, nonce
 });
 
-function text($a) {
+function text($a, $type = '') {
     ?>
-    <input type="text"
+    <input type="<?php echo in_array( $type, ['color', 'number'] ) ? $type : 'text' ?>"
         name="<?php echo esc_attr( $a->name ) ?>"
         id="<?php echo esc_attr( isset( $a->id ) ? $a->id : $a->name ) ?>"
         placeholder="<?php echo isset( $a->placeholder ) ? esc_attr( $a->placeholder )  : '' ?>"
         value="<?php echo isset( $a->value ) ? esc_attr( $a->value ) : '' ?>"
         class="<?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
+        <?php echo isset( $a->step ) ? 'step="'.esc_attr( $a->step ).'"' : '' ?>
     />
+    <?php echo isset( $a->comment ) ? '<p><em>'.esc_html( $a->comment ).'</em></p>' : '' ?>
     <?php
 }
-function color($a) {
-    ?>
-    <input type="color"
-        name="<?php echo esc_attr( $a->name ) ?>"
-        id="<?php echo esc_attr( isset( $a->id ) ? $a->id : $a->name ) ?>"
-        placeholder="<?php echo isset( $a->placeholder ) ? esc_attr( $a->placeholder )  : '' ?>"
-        value="<?php echo isset( $a->value ) ? esc_attr( $a->value ) : '' ?>"
-        class="color-picker <?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
-    />
-    <?php
+function color($a) { text( $a, 'color' ); }
+function number($a) { text( $a, 'number' ); }
+
+function comment($a) {
+    echo wp_filter_kses( $a->comment );
 }
+
 function select($a) {
     ?>
     <select
@@ -528,6 +555,7 @@ function select($a) {
         ><?php echo esc_html( $v ) ?></option>
     <?php } ?>
     </select>
+    <?php echo isset( $a->comment ) ? '<p><em>'.esc_html( $a->comment ).'</em></p>' : '' ?>
     <?php
 }
 function checkboxes($a) {
@@ -547,9 +575,25 @@ function checkboxes($a) {
         </label>
     <?php } ?>
     </fieldset>
+    <?php echo isset( $a->comment ) ? '<p><em>'.esc_html( $a->comment ).'</em></p>' : '' ?>
     <?php
 }
-function radio($a) {
+function checkbox($a) {
+    ?>
+    <label>
+        <input type="checkbox"
+            name="<?php echo esc_attr( $a->name ) ?>"
+            id="<?php echo esc_attr( isset( $a->id ) ? $a->id : $a->name ) ?>"
+            value="<?php echo esc_attr( $a->option ) ?>"
+            class="<?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
+            <?php checked( $a->option, $a->value ) ?>
+        >
+        <span><?php echo esc_html( $a->label ) ?></span>
+    </label>
+    <?php echo isset( $a->comment ) ? '<p><em>'.esc_html( $a->comment ).'</em></p>' : '' ?>
+    <?php
+}
+function radio($a) { // make like others or add the exception
     static $checked = false;
     $checked = $checked ? true : $a->checked === $a->value;
     ?>
@@ -558,30 +602,10 @@ function radio($a) {
         value="<?php echo esc_attr( $a->value ) ?>"
         <?php echo esc_attr( ( $a->checked === $a->value || $a->default && !$checked ) ? 'checked' : '' ) ?>
     >
+    <?php echo isset( $a->comment ) ? '<p><em>'.esc_html( $a->comment ).'</em></p>' : '' ?>
     <?php
 }
 
-// Заполняем опцию 1
-function fill_primer_field1(){
-
-	$val = get_option(FCPPBK_PREF.'settings');
-	$val = $val ? $val['input'] : null;
-	?>
-	<input type="text" name="<?php echo FCPPBK_PREF.'settings' ?>[input]" value="<?php echo esc_attr( $val ) ?>" />
-	<?php
-}
-
-// Заполняем опцию 2
-function fill_primer_field2(){
-
-	$val = get_option(FCPPBK_PREF.'settings');
-	$val = $val ? $val['checkbox'] : null;
-	?>
-	<label><input type="checkbox" name="<?php echo FCPPBK_PREF.'settings' ?>[checkbox]" value="1" <?php checked( 1, $val ) ?> /> отметить</label>
-	<?php
-}
-
-// Очистка данных
 function sanitize_settings( $options ){
 
 	foreach( $options as $name => & $val ){
@@ -592,139 +616,15 @@ function sanitize_settings( $options ){
 			$val = intval( $val );
 	}
 
-	//die(print_r( $options )); // Array ( [input] => aaaa [checkbox] => 1 )
-
 	return $options;
 }
 
 
-// the plugin settings page
-/*
-add_action( 'admin_menu', function () {
-	add_submenu_page( 'options-general.php', 'Posts by Queryuery settings', 'Posts by Queryuery', 'switch_themes', 'posts-by-query', 'FCP\PostsByQuery\settings_page', 'dashicons-clipboard', 99 );
-} );
-
-function settings_page() {
-    ?>
-	<form method="post" action="options.php">
-
-		<?php settings_fields( 'theme-fields' ); ?><br />
-		
-		<h3>Footer fields:</h3>
-
-		<?php do_settings_sections( 'theme-work-hours' ); ?>
-		<?php do_settings_sections( 'theme-additional-info' ); ?>
-
-		<div class="theme-inputs">
-			<p>
-				<span class="theme-iconed">#</span> <input type="text" name="theme-work-hours" value="<?php echo get_option( 'theme-work-hours' ); ?>"/>
-			</p>
-			<p>
-				<span class="theme-iconed">!</span> <input type="text" name="theme-additional-info" value="<?php echo get_option( 'theme-additional-info' ); ?>"/>
-			</p>
-		</div>
-
-		<?php submit_button(); ?>
-	</form>
-
-	<div class="wrap">
-		<h2><?php echo get_admin_page_title() ?></h2>
-
-		<?php
-		// settings_errors() не срабатывает автоматом на страницах отличных от опций
-		if( get_current_screen()->parent_base !== 'options-general' )
-			settings_errors('название_опции');
-		?>
-
-		<form action="options.php" method="POST">
-			<?php
-				settings_fields("opt_group");     // скрытые защитные поля
-				do_settings_sections("opt_page"); // секции с настройками (опциями).
-				submit_button();
-			?>
-		</form>
-	</div>
-
-    <?php
-}
-
-/*
-// adding theme settings
-function theme_settings_menu() {
-	$page_title = 'Common settings';
-	$menu_title = 'Common';
-	$capability = 'edit_pages';
-	$menu_slug  = 'theme-settings';
-	$function   = 'theme_settings_page';
-	$icon_url   = 'dashicons-clipboard';
-	$position   = 2;
-	add_menu_page( $page_title, $menu_title, $capability, $menu_slug, $function, $icon_url, $position );
-}
-add_action( 'admin_menu', 'theme_settings_menu' );
-
-
-function theme_settings_page() {
-	theme_clear_cache();
-    // ++can use example from here https://wp-kama.ru/function/add_menu_page
-?>
-	<h1>Common Settings</h1>
-	
-	<form method="post" action="options.php" class="theme-form">
-		<?php settings_fields( 'theme-fields' ); ?><br />
-		
-		<h3>Footer fields:</h3>
-		<?php do_settings_sections( 'theme-work-hours' ); ?>
-		<?php do_settings_sections( 'theme-additional-info' ); ?>
-		<div class="theme-inputs">
-			<p>
-				<span class="theme-iconed">#</span> <input type="text" name="theme-work-hours" value="<?php echo get_option( 'theme-work-hours' ); ?>"/>
-			</p>
-			<p>
-				<span class="theme-iconed">!</span> <input type="text" name="theme-additional-info" value="<?php echo get_option( 'theme-additional-info' ); ?>"/>
-			</p>
-		</div>
-
-		<?php submit_button(); ?>
-	</form>
-
-	<style>
-		.theme-inputs > p {
-			display:flex;
-			align-items:center;
-			font-size:20px;
-		}
-		.theme-inputs > p > span {
-			margin-right:10px;
-		}
-		.theme-inputs > p > input {
-			flex:1;
-		}
-		@font-face {
-		  font-family: 'Icons';
-		  src: url('<?php echo get_template_directory_uri(); ?>/fonts/icons.eot');
-		  src: url('<?php echo get_template_directory_uri(); ?>/fonts/icons.woff2') format('woff2'),
-			   url('<?php echo get_template_directory_uri(); ?>/fonts/icons.eot?#iefix') format('embedded-opentype');
-		}
-		.theme-iconed {
-			font-family:Icons;
-		}
-	</style>
-<?php
-}
-
-function theme_settings_page_capability( $capability ) {
-	return 'edit_pages';
-}
-add_filter( 'option_page_capability_'.'theme-fields', 'theme_settings_page_capability' );
-
-function theme_settings_save() {
-	register_setting( 'theme-fields', 'theme-work-hours' );
-	register_setting( 'theme-fields', 'theme-additional-info' );
-}
-add_action( 'admin_init', 'theme_settings_save' );
-*/
-
-// ++admin
+// ++!!! the post must not be itself !!!
+// make the layouts for both websites && apply to lanuwa?
+// ++default values on install?
+// ++sanitize admin values
+// ++sanitize before printing
 // ++polish for publishing
     // excape everything before printing
 // ++add a global function to print?
@@ -736,30 +636,10 @@ add_action( 'admin_init', 'theme_settings_save' );
 // ++maybe an option with schema?
 // ++abort previous fetch if new one is here
 // ++some hints how it will work
-/* admin
-    post types to apply the meta
-    maybe some will go to the on-page interface??
-    post types
-        separate for query and for list
-    main color
-    secondary color
-    show date
-    show button
-    show category
-    show the image / size
-    tiles per row
-    excerpt length
-    layout
-        x3-v1
-        x3-v2
-        x2+list
-        list
-    defer styles checkbox
+/* admin settings
     only admin checkbox (or anyone, who can edit the post)
-    preview
     get the first image if no featured
-    read-more text ++ translation
-
+    tiles per row?
 */
 // ++ drag and drop to change the order of particular posts
 // ++ use wp checked()

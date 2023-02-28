@@ -18,10 +18,10 @@
     // --------------- tabs
     (() => {
         const tab_effects = () => {
-            const active_tab = $( `input[type=radio][name=${prefix}variants]:checked` ).val();
+            const active_tab = $( `.${prefix}tabs > input[type=radio][name=${prefix}variants]:checked` ).val();
             const effecting = { 'query' : 'posts-preview', 'list' : 'posts' };
-            $( `fieldset` ).css( 'display', 'none' );
-            $( `fieldset#${prefix}${effecting[active_tab]}` ).css( 'display', 'block' );
+            $( `#${prefix}tiles > fieldset` ).css( 'display', 'none' );
+            $( `#${prefix}tiles > fieldset#${prefix}${effecting[active_tab]}` ).css( 'display', 'block' );
         };
         tab_effects();
 
