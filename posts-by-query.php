@@ -360,8 +360,8 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
         $add( $key );
     };
     $crop_excerpt = function($text, $length) {
-        if ( !$text || !is_numeric( $settings['excerpt-length'] ) ) { return $text; }
-        $text = substr( get_the_excerpt( $p ), 0, $length );
+        if ( !$text || !is_numeric( $length ) ) { return $text; }
+        $text = substr( $text, 0, $length );
         $text = rtrim( substr( $text, 0, strrpos( $text, ' ' ) ), ',.…!?&([{-_ "„“' ) . '…';
         return $text;
     };
@@ -380,7 +380,7 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
             'permalink' => get_permalink( $p ),
             'title' => get_the_title( $p ),
             'date' => $settings['hide-date'] ? '' : get_the_date( '', $p ),
-            'excerpt' => $settings['hide-excerpt'] ? '' : get_the_excerpt( $p ),
+            'excerpt' => $settings['hide-excerpt'] ? '' : $crop_excerpt( get_the_excerpt( $p ), $settings['excerpt-length'] ),
             'category' => empty( $categories ) ? '' : $categories[0]->name,
             'category_link' => empty( $categories ) ? '' : get_category_link( $categories[0]->term_id ),
             'thumbnail' => $settings['thumbnail-size'] ? get_the_post_thumbnail( $p, $settings['thumbnail-size'] ) : '',
@@ -388,7 +388,6 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
         ];
         $param_add( 'title_linked' );
         $param_add( 'date', $params['date'] );
-        $params['excerpt'] = $crop_excerpt( $params['excerpt'], $settings['excerpt-length'] );
         $param_add( 'excerpt', $params['excerpt'] );
         $param_add( 'category_linked', $params['category'] && $params['category_link'] );
         $param_add( 'thumbnail_linked', $params['thumbnail'] );
@@ -500,8 +499,8 @@ add_action( 'admin_init', function() {
 	add_settings_section( $settings->section, 'Styling settings', '', $settings->page );
         $add_settings_field( 'Main color', 'color' ); // ++use wp default picker
         $add_settings_field( 'Secondary color', 'color' );
-        $add_settings_field( 'Layout', 'select', [ 'options' => $layout_options ] );
-        $add_settings_field( 'Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ] ); // ++ make the comment work
+        //$add_settings_field( 'Layout', 'select', [ 'options' => $layout_options ] );
+        //$add_settings_field( 'Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ] ); // ++ make the comment work
         $add_settings_field( 'Thumbnail size', 'select', [ 'options' => $thumbnail_sizes ] );
         $add_settings_field( 'Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols' ] );
         $add_settings_field( '"Read more" text', 'text', [ 'placeholder' => __( 'Read more' ) ] );
@@ -517,7 +516,7 @@ add_action( 'admin_init', function() {
     add_settings_section( $settings->section, 'Other settings', '', $settings->page );
         $add_settings_field( 'Select from', 'checkboxes', [ 'options' => $public_post_types ] );
         $add_settings_field( 'Apply to', 'checkboxes', [ 'options' => $public_post_types, 'comment' => 'This will add the option to query the posts to selected post types editor bottom' ] );
-        $add_settings_field( 'Defer style', 'checkbox', [ 'option' => '1', 'label' => 'defer the render blocking style.css', 'comment' => 'If you use a caching plugin, most probably it fulfulls the role of this checkbox' ] );
+        //$add_settings_field( 'Defer style', 'checkbox', [ 'option' => '1', 'label' => 'defer the render blocking style.css', 'comment' => 'If you use a caching plugin, most probably it fulfulls the role of this checkbox' ] );
 
     register_setting( FCPPBK_PREF.'settings-group1', $settings->varname, __NAMESPACE__.'\sanitize_settings' ); // register, save, nonce
 });
