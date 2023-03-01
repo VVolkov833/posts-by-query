@@ -327,21 +327,23 @@ function sanitize_meta( $value, $field, $postID ) {
 
 add_shortcode( FCPPBK_SLUG, function() {
 
-    wp_enqueue_style(
-        'fcp-posts-by-query',
-        plugins_url( '/' ,__FILE__ ) . 'styles/style-1.css',
+    $settings = get_option( FCPPBK_PREF.'settings' );
+
+    $style_handle = 'fcp-posts-by-query';
+    wp_register_style(
+        $style_handle,
+        plugins_url( '/' ,__FILE__ ) . 'styles/'.$settings['layout'].'.css',
         [],
-        FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/styles/style-1.css' ),
+        FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/styles/'.$settings['layout'].'.css' ),
     );
-    // ++inline styling for variables
+    wp_enqueue_style( $style_handle );
+    wp_add_inline_style( $style_handle, '.'.FCPPBK_SLUG.'{--main-color:'.$settings['main-color'].';--secondary-color:'.$settings['secondary-color'].';}' );
 
     $metas = array_map( function( $value ) {
         return $value[0];
     }, array_filter( get_post_custom(), function($key) {
         return strpos( $key, FCPPBK_PREF ) === 0;
     }, ARRAY_FILTER_USE_KEY ) );
-
-    $settings = get_option( FCPPBK_PREF.'settings' );
 
     $layouts = layout_options( $settings['limit-the-list'] )[ $settings['layout'] ]['l'];
 
@@ -442,7 +444,7 @@ add_shortcode( FCPPBK_SLUG, function() {
 
     $result = [
         'headline' => $settings['headline'] ? $format( [ 'headline' => $settings['headline'] ], 'headline' ) : '',
-        'css_class' => FCPPBK_PREF.$settings['layout'] . ' ' . $settings['css-class'],
+        'css_class' => FCPPBK_SLUG . ' ' . FCPPBK_PREF.$settings['layout'] . ' ' . $settings['css-class'],
     ];
     $ind = 0;
     foreach ( $layouts as $k => $v) {
@@ -452,18 +454,8 @@ add_shortcode( FCPPBK_SLUG, function() {
         }
     }
 
-    //return print_r( $tiles );
-
     return $format( $result, $settings['layout'] );
-    //$result[] = $format( $params, 'column' );
 
-    //return $format( $params, '' );
-
-    //wp_reset_postdata();
-
-//print_r( $result ); exit;
-
-    //return '<section class="'.FCPPBK_SLUG.' container"><div>' . implode( '', $result) . '</div></section>';
 });
 
 
@@ -670,11 +662,12 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
-// telmpate
 // the rest of settings
 // ++!!! the post must not be itself !!!
+// ++shortcode attrs to override the default settings
 // make the layouts for both websites && apply to lanuwa?
 // ++default values on install?
+// ++style
 // ++sanitize admin values
 // ++sanitize before printing
 // ++polish for publishing
