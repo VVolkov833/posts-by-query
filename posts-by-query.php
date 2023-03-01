@@ -23,7 +23,7 @@ define( 'FCPPBK_DEV', false );
 define( 'FCPPBK_VER', get_file_data( __FILE__, [ 'ver' => 'Version' ] )[ 'ver' ] . ( FCPPBK_DEV ? time() : '' ) );
 
 function get_search_post_types() { // ++replace with the option value
-    return ['post', 'page', 'brustchirurgie', 'gesichtschirurgie', 'koerperchirurgie', 'haut' ];
+    return ['page'];
 }
 function layout_options($list_length = 0) {
     $list_length = $list_length ? $list_length : 10;
@@ -100,10 +100,11 @@ add_action( 'admin_enqueue_scripts', function() {
 // api to fetch the query
 add_action( 'rest_api_init', function () {
 
-    $route_args = function($results_format) {
+    $settings = get_option( FCPPBK_PREF.'settings' );
+    $route_args = function($results_format) use ($settings) {
 
         $wp_query_args = [
-            'post_type' => get_search_post_types(),
+            'post_type' => $settings['select-from'],
             'post_status' => 'publish',
             //'sentence' => true,
             'posts_per_page' => 20,
@@ -226,8 +227,10 @@ function metabox_query() {
         $ids = get_post_meta( $post->ID, FCPPBK_PREF.'posts' )[0];
         if ( !empty( $ids ) ) {
 
+            $settings = get_option( FCPPBK_PREF.'settings' );
+
             $search = new \WP_Query( [
-                'post_type' => get_search_post_types(),
+                'post_type' => $settings['select-from'],
                 'post_status' => 'publish',
                 'post__in' => $ids,
                 'orderby' => 'post__in',
@@ -353,7 +356,7 @@ add_shortcode( FCPPBK_SLUG, function() {
     }, 0 );
 
     $wp_query_args = [
-        'post_type' => get_search_post_types(),
+        'post_type' => $settings['select-from'],
         'post_status' => 'publish',
         'posts_per_page' => $limit,
     ];
@@ -387,11 +390,13 @@ add_shortcode( FCPPBK_SLUG, function() {
         return $cached[ $name ];
     };
     $format = function($params, $template_name) use ($template) { // ++refactor
+        if ( empty( $params ) ) { return []; }
         return strtr( $template( $template_name ), array_reduce( array_keys( $params ), function( $result, $item ) use ( $params ) {
             $result[ '%'.$item ] = $params[ $item ];
             return $result;
         }, [] ) );
     };
+
     $params = [];
     $param_add = function( $key, $fill = true ) use ( $format, &$params ) { //++rename so it says that it loads the template
         $add = function($key) use ($format, &$params, $fill) { $params[ $key ] = $fill ? $format( $params, $key ) : ''; };
@@ -416,8 +421,6 @@ add_shortcode( FCPPBK_SLUG, function() {
         $categories = $settings['hide-category'] ? '' : get_the_category( $p );
 //++ add filters like esc_url and esc_html
         $params = [
-            //'classname' => FCPPBK_SLUG,
-            //'headline' => $settings['headline'],
             'id' => get_the_ID( $p ),
             'permalink' => get_permalink( $p ),
             'title' => get_the_title( $p ),
@@ -428,7 +431,6 @@ add_shortcode( FCPPBK_SLUG, function() {
             'thumbnail' => $settings['thumbnail-size'] ? get_the_post_thumbnail( $p, $settings['thumbnail-size'] ) : '',
             'readmore' => __( $settings['read-more-text'] ? $settings['read-more-text'] : 'Read more' ),
         ];
-        //$param_add( 'headline', $params['headline'] );
         $param_add( 'title_linked' );
         $param_add( 'date', $params['date'] );
         $param_add( 'excerpt', $params['excerpt'] );
@@ -436,10 +438,8 @@ add_shortcode( FCPPBK_SLUG, function() {
         $param_add( 'thumbnail_linked', $params['thumbnail'] );
         $param_add( 'button', !$settings['hide-read-more'] );
 
-        ksort( $params, SORT_STRING ); // avoid smaller overriding bigger
+        ksort( $params, SORT_STRING ); // avoid smaller replacing bigger parts ++test if DESC
         $posts[] = $params;
-        //echo '<pre>';
-        //print_r( [ $settings, $params ] ); exit;
     }
 
     $result = [
@@ -447,6 +447,7 @@ add_shortcode( FCPPBK_SLUG, function() {
         'css_class' => FCPPBK_SLUG . ' ' . FCPPBK_PREF.$settings['layout'] . ' ' . $settings['css-class'],
     ];
     $ind = 0;
+
     foreach ( $layouts as $k => $v) {
         for ( $i = 0; $i < $v; $i++ ) {
             $result[ $k ] .= $format( $posts[ $ind ], $k );
