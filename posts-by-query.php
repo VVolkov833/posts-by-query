@@ -25,6 +25,36 @@ define( 'FCPPBK_VER', get_file_data( __FILE__, [ 'ver' => 'Version' ] )[ 'ver' ]
 function get_search_post_types() { // ++replace with the option value
     return ['post', 'page', 'brustchirurgie', 'gesichtschirurgie', 'koerperchirurgie', 'haut' ];
 }
+function layout_options($list_length = 0) {
+    $list_length = $list_length ? $list_length : 10;
+    return [
+        '2-columns' => [
+            't' => '2 columns',
+            'l' => [
+                'column' => 2,
+            ],
+        ],
+        '3-columns' => [
+            't' => '3 columns',
+            'l' => [
+                'column' => 3,
+            ],
+        ],
+        '1-list' => [
+            't' => '1 list',
+            'l' => [
+                'list' => $list_length,
+            ],
+        ],
+        '2-columns-1-list' => [
+            't' => '2 columns + 1 list',
+            'l' => [
+                'column' => 2,
+                'list' => $list_length,
+            ],
+        ],
+    ];
+}
 
 // admin interface
 add_action( 'add_meta_boxes', function() {
@@ -295,25 +325,35 @@ function sanitize_meta( $value, $field, $postID ) {
     return '';
 }
 
-add_shortcode( FCPPBK_SLUG, function($atts = []) {
-    $allowed = [
-        'layout' => 'default',
-        'styles' => 'style-1',
-        'headline' => 'Das könnte Sie auch interessieren', //++replace with a wrapper
-    ];
-    $atts = shortcode_atts( $allowed, $atts );
-    
+add_shortcode( FCPPBK_SLUG, function() {
+
+    wp_enqueue_style(
+        'fcp-posts-by-query',
+        plugins_url( '/' ,__FILE__ ) . 'styles/style-1.css',
+        [],
+        FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/styles/style-1.css' ),
+    );
+    // ++inline styling for variables
+
     $metas = array_map( function( $value ) {
         return $value[0];
     }, array_filter( get_post_custom(), function($key) {
         return strpos( $key, FCPPBK_PREF ) === 0;
     }, ARRAY_FILTER_USE_KEY ) );
 
+    $settings = get_option( FCPPBK_PREF.'settings' );
+
+    $layouts = layout_options( $settings['limit-the-list'] )[ $settings['layout'] ]['l'];
+
+    $limit = array_reduce( $layouts, function( $result, $item ) {
+        $result += $item;
+        return $result;
+    }, 0 );
 
     $wp_query_args = [
         'post_type' => get_search_post_types(),
         'post_status' => 'publish',
-        'posts_per_page' => 3,
+        'posts_per_page' => $limit,
     ];
 
     $results_format = $metas[ FCPPBK_PREF.'variants' ];
@@ -351,7 +391,7 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
         }, [] ) );
     };
     $params = [];
-    $param_add = function( $key, $fill = true ) use ( $format, &$params ) { //++$key, $fill (condition, which gotta be true and fill empty if is false)
+    $param_add = function( $key, $fill = true ) use ( $format, &$params ) { //++rename so it says that it loads the template
         $add = function($key) use ($format, &$params, $fill) { $params[ $key ] = $fill ? $format( $params, $key ) : ''; };
         if ( is_array( $key ) ) {
             foreach( $key as $v ) { $add( $v ); }
@@ -366,9 +406,7 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
         return $text;
     };
 
-    $settings = get_option( FCPPBK_PREF.'settings' );
-
-    $result = [];
+    $posts = [];
     while ( $search->have_posts() ) {
         //$search->the_post(); // has the conflict with Glossary (Premium) plugin, which flushes the first post in a loop to the root one with the_excerpt()
         $p = $search->next_post();
@@ -376,6 +414,8 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
         $categories = $settings['hide-category'] ? '' : get_the_category( $p );
 //++ add filters like esc_url and esc_html
         $params = [
+            //'classname' => FCPPBK_SLUG,
+            //'headline' => $settings['headline'],
             'id' => get_the_ID( $p ),
             'permalink' => get_permalink( $p ),
             'title' => get_the_title( $p ),
@@ -386,6 +426,7 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
             'thumbnail' => $settings['thumbnail-size'] ? get_the_post_thumbnail( $p, $settings['thumbnail-size'] ) : '',
             'readmore' => __( $settings['read-more-text'] ? $settings['read-more-text'] : 'Read more' ),
         ];
+        //$param_add( 'headline', $params['headline'] );
         $param_add( 'title_linked' );
         $param_add( 'date', $params['date'] );
         $param_add( 'excerpt', $params['excerpt'] );
@@ -393,25 +434,36 @@ add_shortcode( FCPPBK_SLUG, function($atts = []) {
         $param_add( 'thumbnail_linked', $params['thumbnail'] );
         $param_add( 'button', !$settings['hide-read-more'] );
 
-        ksort( $params, SORT_STRING ); // ++ end with % instead of probability??
-        $result[] = $format( $params, 'column' );
+        ksort( $params, SORT_STRING ); // avoid smaller overriding bigger
+        $posts[] = $params;
         //echo '<pre>';
         //print_r( [ $settings, $params ] ); exit;
-
     }
+
+    $result = [
+        'headline' => $settings['headline'] ? $format( [ 'headline' => $settings['headline'] ], 'headline' ) : '',
+        'css_class' => FCPPBK_PREF.$settings['layout'] . ' ' . $settings['css-class'],
+    ];
+    $ind = 0;
+    foreach ( $layouts as $k => $v) {
+        for ( $i = 0; $i < $v; $i++ ) {
+            $result[ $k ] .= $format( $posts[ $ind ], $k );
+            $ind++;
+        }
+    }
+
+    //return print_r( $tiles );
+
+    return $format( $result, $settings['layout'] );
+    //$result[] = $format( $params, 'column' );
+
+    //return $format( $params, '' );
 
     //wp_reset_postdata();
 
 //print_r( $result ); exit;
 
-    wp_enqueue_style(
-        'fcp-posts-by-query',
-        plugins_url( '/' ,__FILE__ ) . 'styles/style-1.css',
-        [],
-        FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/styles/style-1.css' ),
-    );
-
-    return '<section class="'.FCPPBK_SLUG.' container"><h2>'.$atts['headline'].'</h2><div>' . implode( '', $result) . '</div></section>';
+    //return '<section class="'.FCPPBK_SLUG.' container"><div>' . implode( '', $result) . '</div></section>';
 });
 
 
@@ -476,11 +528,9 @@ add_action( 'admin_init', function() {
         );
     };
 
-    $layout_options = [ '2 columns', '3 columns', 'List', '2 columns + 1 list' ];
-    $layout_options = array_reduce( $layout_options, function( $result, $item ) {
-        $result[ sanitize_title( $item ) ] = $item;
-        return $result;
-    }, [] );
+    $layout_options = array_map( function( $a ) {
+        return $a['t'];
+    }, layout_options() );
 
     $thumbnail_sizes = wp_get_registered_image_subsizes(); //++full, ++no image
     $thumbnail_sizes = [ '' => 'No image', 'full' => 'Full' ] + array_reduce( array_keys( $thumbnail_sizes ), function( $result, $item ) use ( $thumbnail_sizes ) {
@@ -499,8 +549,8 @@ add_action( 'admin_init', function() {
 	add_settings_section( $settings->section, 'Styling settings', '', $settings->page );
         $add_settings_field( 'Main color', 'color' ); // ++use wp default picker
         $add_settings_field( 'Secondary color', 'color' );
-        //$add_settings_field( 'Layout', 'select', [ 'options' => $layout_options ] );
-        //$add_settings_field( 'Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ] ); // ++ make the comment work
+        $add_settings_field( 'Layout', 'select', [ 'options' => $layout_options ] );
+        $add_settings_field( 'Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ] ); // ++ make the comment work
         $add_settings_field( 'Thumbnail size', 'select', [ 'options' => $thumbnail_sizes ] );
         $add_settings_field( 'Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols' ] );
         $add_settings_field( '"Read more" text', 'text', [ 'placeholder' => __( 'Read more' ) ] );
@@ -514,6 +564,8 @@ add_action( 'admin_init', function() {
 
     $settings->section = 'other-settings';
     add_settings_section( $settings->section, 'Other settings', '', $settings->page );
+        $add_settings_field( 'Headline', 'text' );
+        $add_settings_field( 'CSS Class', 'text' );
         $add_settings_field( 'Select from', 'checkboxes', [ 'options' => $public_post_types ] );
         $add_settings_field( 'Apply to', 'checkboxes', [ 'options' => $public_post_types, 'comment' => 'This will add the option to query the posts to selected post types editor bottom' ] );
         //$add_settings_field( 'Defer style', 'checkbox', [ 'option' => '1', 'label' => 'defer the render blocking style.css', 'comment' => 'If you use a caching plugin, most probably it fulfulls the role of this checkbox' ] );
@@ -618,7 +670,8 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
-
+// telmpate
+// the rest of settings
 // ++!!! the post must not be itself !!!
 // make the layouts for both websites && apply to lanuwa?
 // ++default values on install?
