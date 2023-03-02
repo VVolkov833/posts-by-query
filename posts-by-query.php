@@ -26,7 +26,7 @@ function get_search_post_types() { // ++replace with the option value
     return ['page'];
 }
 function layout_options($list_length = 0) {
-    $list_length = $list_length ? $list_length : 10;
+    $list_length = is_numeric( $list_length ) ? $list_length : 10;
     return [
         '2-columns' => [
             't' => '2 columns',
@@ -81,9 +81,9 @@ add_action( 'admin_enqueue_scripts', function() {
     foreach ( scandir( $assets_path ) as $v ) {
         if ( !is_file( $assets_path.'/'.$v ) ) { continue; }
         $onthelist = array_reduce( $files[ $screen->base ], function( $result, $item ) use ( $v ) {
-            $result = $result ? $result : strpos( $v, $item.'.' ) === 0;
+            $result = $result ?: ( strpos( $v, $item.'.' ) === 0 );
             return $result;
-        });
+        }, false );
         if ( !$onthelist ) { continue; }
 
         $ext = substr( $v, strrpos( $v, '.' )+1 );
@@ -188,7 +188,7 @@ function metabox_query() {
         radio( (object) [
             'name' => FCPPBK_PREF.'variants',
             'value' => 'query',
-            'checked' => get_post_meta( $post->ID, FCPPBK_PREF.'variants' )[0],
+            'checked' => get_post_meta( $post->ID, FCPPBK_PREF.'variants' )[0] ?? false,
             'default' => true,
         ]);
         ?>
@@ -198,7 +198,7 @@ function metabox_query() {
             text( (object) [
                 'name' => FCPPBK_PREF.'query',
                 'placeholder' => 'search query',
-                'value' => get_post_meta( $post->ID, FCPPBK_PREF.'query' )[0],
+                'value' => get_post_meta( $post->ID, FCPPBK_PREF.'query' )[0] ?? '',
             ]);
             ?>
         </div>
@@ -207,7 +207,7 @@ function metabox_query() {
         radio( (object) [
             'name' => FCPPBK_PREF.'variants',
             'value' => 'list',
-            'checked' => get_post_meta( $post->ID, FCPPBK_PREF.'variants' )[0],
+            'checked' => get_post_meta( $post->ID, FCPPBK_PREF.'variants' )[0] ?? false,
         ]);
         ?>
         <div>
@@ -216,7 +216,7 @@ function metabox_query() {
             text( (object) [
                 'name' => FCPPBK_PREF.'list',
                 'placeholder' => 'search query',
-                'value' => get_post_meta( $post->ID, FCPPBK_PREF.'list' )[0],
+                'value' => get_post_meta( $post->ID, FCPPBK_PREF.'list' )[0] ?? '',
             ]);
             ?>
         </div>
@@ -224,7 +224,8 @@ function metabox_query() {
 
     <div id="<?php echo esc_attr( FCPPBK_PREF ) ?>tiles">
         <?php
-        $ids = get_post_meta( $post->ID, FCPPBK_PREF.'posts' )[0];
+        $ids = get_post_meta( $post->ID, FCPPBK_PREF.'posts' )[0] ?? [];
+        $result = [];
         if ( !empty( $ids ) ) {
 
             $settings = get_option( FCPPBK_PREF.'settings' );
@@ -236,7 +237,6 @@ function metabox_query() {
                 'orderby' => 'post__in',
             ] );
             if ( $search->have_posts() ) {
-                $result = [];
                 while ( $search->have_posts() ) {
                     $p = $search->next_post();
                     $result[ $p->ID ] = $p->post_title;
@@ -271,7 +271,7 @@ function get_all_post_types() {
     $archive[ 'blog' ] = 'Blog';
     usort( $all, function($a,$b) { return strcasecmp( $a->label, $b->label ); });
     foreach ( $all as $type ) {
-        $type->name = isset( $type->rewrite->slug ) ? $type->rewrite->slug : $type->name;
+        $type->name = $type->rewrite->slug ?? $type->name;
         if ( $type->has_archive ) {
             $archive[ $type->name ] = $type->label;
         }
@@ -399,7 +399,7 @@ add_shortcode( FCPPBK_SLUG, function() {
 
     $params = [];
     $param_add = function( $key, $fill = true ) use ( $format, &$params ) { //++rename so it says that it loads the template
-        $add = function($key) use ($format, &$params, $fill) { $params[ $key ] = $fill ? $format( $params, $key ) : ''; };
+        $add = function($key) use ($format, &$params, $fill) { $params[ $key ] = ( $fill ? $format( $params, $key ) : '' ); };
         if ( is_array( $key ) ) {
             foreach( $key as $v ) { $add( $v ); }
             return;
@@ -418,25 +418,25 @@ add_shortcode( FCPPBK_SLUG, function() {
         //$search->the_post(); // has the conflict with Glossary (Premium) plugin, which flushes the first post in a loop to the root one with the_excerpt()
         $p = $search->next_post();
 
-        $categories = $settings['hide-category'] ? '' : get_the_category( $p );
+        $categories = isset( $settings['hide-category'] ) ? [] : get_the_category( $p );
 //++ add filters like esc_url and esc_html
         $params = [
             'id' => get_the_ID( $p ),
             'permalink' => get_permalink( $p ),
             'title' => get_the_title( $p ),
-            'date' => $settings['hide-date'] ? '' : get_the_date( '', $p ),
-            'excerpt' => $settings['hide-excerpt'] ? '' : $crop_excerpt( get_the_excerpt( $p ), $settings['excerpt-length'] ),
+            'date' => isset( $settings['hide-date'] ) ? '' : get_the_date( '', $p ),
+            'excerpt' => isset( $settings['hide-excerpt'] ) ? '' : $crop_excerpt( get_the_excerpt( $p ), $settings['excerpt-length'] ),
             'category' => empty( $categories ) ? '' : $categories[0]->name,
             'category_link' => empty( $categories ) ? '' : get_category_link( $categories[0]->term_id ),
             'thumbnail' => $settings['thumbnail-size'] ? get_the_post_thumbnail( $p, $settings['thumbnail-size'] ) : '',
-            'readmore' => __( $settings['read-more-text'] ? $settings['read-more-text'] : 'Read more' ),
+            'readmore' => __( $settings['read-more-text'] ?: 'Read more' ),
         ];
         $param_add( 'title_linked' );
         $param_add( 'date', $params['date'] );
         $param_add( 'excerpt', $params['excerpt'] );
         $param_add( 'category_linked', $params['category'] && $params['category_link'] );
         $param_add( 'thumbnail_linked', $params['thumbnail'] );
-        $param_add( 'button', !$settings['hide-read-more'] );
+        $param_add( 'button', !isset( $settings['hide-read-more'] ) );
 
         ksort( $params, SORT_STRING ); // avoid smaller replacing bigger parts ++test if DESC
         $posts[] = $params;
@@ -445,11 +445,14 @@ add_shortcode( FCPPBK_SLUG, function() {
     $result = [
         'headline' => $settings['headline'] ? $format( [ 'headline' => $settings['headline'] ], 'headline' ) : '',
         'css_class' => FCPPBK_SLUG . ' ' . FCPPBK_PREF.$settings['layout'] . ' ' . $settings['css-class'],
+        'column' => '',
+        'list' => '',
     ];
     $ind = 0;
 
-    foreach ( $layouts as $k => $v) {
+    foreach ( $layouts as $k => $v ) {
         for ( $i = 0; $i < $v; $i++ ) {
+            if ( !isset( $posts[ $ind ] ) ) { break 2; }
             $result[ $k ] .= $format( $posts[ $ind ], $k );
             $ind++;
         }
@@ -497,25 +500,23 @@ add_action( 'admin_init', function() {
         $type = ( empty( $type ) || !in_array( $type, $types ) ) ? $types[0] : $type;
         $function = __NAMESPACE__.'\\'.$type;
         if ( !function_exists( $function ) ) { return; }
-        $slug = empty( $atts['slug'] ) ? sanitize_title( $title ) : $atts['slug'];
+        $slug = $atts['slug'] ?? sanitize_title( $title );
 
         $attributes = (object) [
             'name' => $settings->varname.'['.$slug.']',
             'id' => $settings->varname . '--' . $slug,
-            'value' => $settings->values[ $slug ],
-            'placeholder' => empty( $atts['placeholder'] ) ? '' : $atts['placeholder'], // ++unify with the rest
-            'options' => empty( $atts['options'] ) ? '' : $atts['options'],
-            'option' => empty( $atts['option'] ) ? '' : $atts['option'],
-            'label' => empty( $atts['label'] ) ? '' : $atts['label'],
-            'comment' => empty( $atts['comment'] ) ? '' : $atts['comment'],
+            'value' => $slug ? ( $settings->values[ $slug ] ?? '' ) : '',
+            'placeholder' => $atts['placeholder'] ?? '',
+            'options' => $atts['options'] ?? '',
+            'option' => $atts['option'] ?? '',
+            'label' => $atts['label'] ?? '',
+            'comment' => $atts['comment'] ?? '',
         ];
 
         add_settings_field(
             $slug,
             $title,
-            function() use ( $attributes, $function ) {
-                call_user_func( $function, $attributes );
-            },
+            function() use ( $attributes, $function ) { call_user_func( $function, $attributes ); },
             $settings->page,
             $settings->section
         );
@@ -570,10 +571,10 @@ function text($a, $type = '') {
     ?>
     <input type="<?php echo in_array( $type, ['color', 'number'] ) ? $type : 'text' ?>"
         name="<?php echo esc_attr( $a->name ) ?>"
-        id="<?php echo esc_attr( isset( $a->id ) ? $a->id : $a->name ) ?>"
-        placeholder="<?php echo isset( $a->placeholder ) ? esc_attr( $a->placeholder )  : '' ?>"
-        value="<?php echo isset( $a->value ) ? esc_attr( $a->value ) : '' ?>"
-        class="<?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
+        id="<?php echo esc_attr( $a->id ?? $a->name ) ?>"
+        placeholder="<?php echo esc_attr( $a->placeholder ?? '' ) ?>"
+        value="<?php echo esc_attr( $a->value ?? '' ) ?>"
+        class="<?php echo esc_attr( $a->className ?? '' ) ?>"
         <?php echo isset( $a->step ) ? 'step="'.esc_attr( $a->step ).'"' : '' ?>
     />
     <?php echo isset( $a->comment ) ? '<p><em>'.esc_html( $a->comment ).'</em></p>' : '' ?>
@@ -590,8 +591,8 @@ function select($a) {
     ?>
     <select
         name="<?php echo esc_attr( $a->name ) ?>"
-        id="<?php echo esc_attr( isset( $a->id ) ? $a->id : $a->name ) ?>"
-        class="<?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
+        id="<?php echo esc_attr( $a->id ?? $a->name ) ?>"
+        class="<?php echo esc_attr( $a->className ?? '' ) ?>"
     >
     <?php foreach ( $a->options as $k => $v ) { ?>
         <option value="<?php echo esc_attr( $k ) ?>"
@@ -605,8 +606,8 @@ function select($a) {
 function checkboxes($a) {
     ?>
     <fieldset
-        id="<?php echo esc_attr( isset( $a->id ) ? $a->id : $a->name ) ?>"
-        class="<?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
+        id="<?php echo esc_attr( $a->id ?? $a->name ) ?>"
+        class="<?php echo esc_attr( $a->className ?? '' ) ?>"
     >
     <?php foreach ( $a->options as $k => $v ) { ?>
         <label>
@@ -627,9 +628,9 @@ function checkbox($a) {
     <label>
         <input type="checkbox"
             name="<?php echo esc_attr( $a->name ) ?>"
-            id="<?php echo esc_attr( isset( $a->id ) ? $a->id : $a->name ) ?>"
+            id="<?php echo esc_attr( $a->id ?? $a->name ) ?>"
             value="<?php echo esc_attr( $a->option ) ?>"
-            class="<?php echo isset( $a->className ) ? esc_attr( $a->className ) : '' ?>"
+            class="<?php echo esc_attr( $a->className ?? '' ) ?>"
             <?php checked( $a->option, $a->value ) ?>
         >
         <span><?php echo esc_html( $a->label ) ?></span>
@@ -638,13 +639,13 @@ function checkbox($a) {
     <?php
 }
 function radio($a) { // make like others or add the exception
-    static $checked = false;
-    $checked = $checked ? true : $a->checked === $a->value;
+    static $checked_once = false;
+    $checked_once = $checked_once ?: $a->checked === $a->value;
     ?>
     <input type="radio"
         name="<?php echo esc_attr( $a->name ) ?>"
         value="<?php echo esc_attr( $a->value ) ?>"
-        <?php echo esc_attr( ( $a->checked === $a->value || $a->default && !$checked ) ? 'checked' : '' ) ?>
+        <?php checked( $a->checked === $a->value || ($a->default ?? false) && !$checked_once, true ) ?>
     >
     <?php echo isset( $a->comment ) ? '<p><em>'.esc_html( $a->comment ).'</em></p>' : '' ?>
     <?php
@@ -663,16 +664,19 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
+// go through errors and warnings?
+// ++template with 1 tile && access it with the api
 // the rest of settings
 // ++!!! the post must not be itself !!!
 // ++shortcode attrs to override the default settings
 // make the layouts for both websites && apply to lanuwa?
 // ++default values on install?
-// ++style
+// ++style!! I want
 // ++sanitize admin values
 // ++sanitize before printing
 // ++polish for publishing
     // excape everything before printing
+// ++defaault image
 // ++add a global function to print?
 // ++option to print automatically?
     // ++is it allowed to make the gutenberg block??
