@@ -40,17 +40,23 @@ function layout_options($list_length = 0) {
                 'column' => 3,
             ],
         ],
+        '2-columns-1-list' => [
+            't' => '2 columns + 1 list',
+            'l' => [
+                'column' => 2,
+                'list' => $list_length,
+            ],
+        ],
         '1-list' => [
             't' => '1 list',
             'l' => [
                 'list' => $list_length,
             ],
         ],
-        '2-columns-1-list' => [
-            't' => '2 columns + 1 list',
+        '1-tile' => [
+            't' => '1 tile',
             'l' => [
-                'column' => 2,
-                'list' => $list_length,
+                'column' => 1,
             ],
         ],
     ];
@@ -332,15 +338,18 @@ add_shortcode( FCPPBK_SLUG, function() {
 
     $settings = get_option( FCPPBK_PREF.'settings' );
 
-    $style_handle = 'fcp-posts-by-query';
-    wp_register_style(
-        $style_handle,
-        plugins_url( '/' ,__FILE__ ) . 'styles/'.$settings['layout'].'.css',
-        [],
-        FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/styles/'.$settings['layout'].'.css' ),
-    );
-    wp_enqueue_style( $style_handle );
-    wp_add_inline_style( $style_handle, '.'.FCPPBK_SLUG.'{--main-color:'.$settings['main-color'].';--secondary-color:'.$settings['secondary-color'].';}' );
+    $style_path_end = 'styles/'.$settings['layout'].'.css';
+    if ( is_file( __DIR__.'/' . $style_path_end ) ) {
+        $style_handle = 'fcp-posts-by-query';
+        wp_register_style(
+            $style_handle,
+            plugins_url( '/' ,__FILE__ ) . $style_path_end,
+            [],
+            FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/' . $style_path_end ),
+        );
+        wp_enqueue_style( $style_handle );
+        wp_add_inline_style( $style_handle, '.'.FCPPBK_SLUG.'{--main-color:'.$settings['main-color'].';--secondary-color:'.$settings['secondary-color'].';}' );
+    }
 
     $metas = array_map( function( $value ) {
         return $value[0];
@@ -664,8 +673,6 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
-// go through errors and warnings?
-// ++template with 1 tile && access it with the api
 // the rest of settings
 // ++!!! the post must not be itself !!!
 // ++shortcode attrs to override the default settings
@@ -693,3 +700,4 @@ function sanitize_settings( $options ){
 */
 // ++ drag and drop to change the order of particular posts
 // ++ use wp checked()
+// ++ preview using 1-tile layout && api
