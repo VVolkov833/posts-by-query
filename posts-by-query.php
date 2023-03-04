@@ -59,6 +59,27 @@ function layout_options($list_length = 0) {
     ];
 }
 
+function styling_options($list_length = 0) {
+    return [
+        'style-1' => 'Style 1',
+        'style-2' => 'Style 2',
+    ];
+}
+
+// fill in the initial settings
+register_activation_hook( __FILE__, function() {
+    add_option( FCPPBK_PREF.'settings', [
+        'main-color' => '#007cba',
+        'secondary-color' => '#abb8c3',
+        'layout' => '3-columns',
+        'thumbnail-size' => 'medium',
+        'excerpt-length' => '200',
+        'select-from' => [ 'post' ],
+        'apply-to' => [ 'page', 'post' ],
+    ]);
+
+});
+
 // admin interface
 add_action( 'add_meta_boxes', function() {
     if ( !current_user_can( 'administrator' ) ) { return; }
@@ -344,18 +365,24 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
 
     $settings = get_settings();
 
-    $style_path_end = 'styles/'.$settings['layout'].'.css';
-    if ( is_file( __DIR__.'/' . $style_path_end ) ) {
-        $style_handle = 'fcp-posts-by-query';
-        wp_register_style(
-            $style_handle,
-            plugins_url( '/' ,__FILE__ ) . $style_path_end,
-            [],
-            FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/' . $style_path_end ),
-        );
-        wp_enqueue_style( $style_handle );
-        wp_add_inline_style( $style_handle, '.'.FCPPBK_SLUG.'{--main-color:'.$settings['main-color'].';--secondary-color:'.$settings['secondary-color'].';}' );
+    // styles
+    $handle = FCPPBK_PREF.'settings';
+    wp_register_style( $handle, false );
+    wp_enqueue_style( $handle );
+    wp_add_inline_style( $handle, '.'.FCPPBK_SLUG.'{--main-color:'.$settings['main-color'].';--secondary-color:'.$settings['secondary-color'].';}' );
+
+    $path = 'styles/'.$settings['layout'].'.css';
+    $handle = FCPPBK_PREF.'layout';
+    if ( is_file( __DIR__.'/' . $path ) ) {
+        wp_enqueue_style( $handle, plugins_url( '/' ,__FILE__ ) . $path, [], FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/' . $path ) );
     }
+
+    $path = 'styling-options/'.$settings['style'].'.css';
+    $handle = FCPPBK_PREF.'style';
+    if ( is_file( __DIR__.'/' . $path ) ) {
+        wp_enqueue_style( $handle, plugins_url( '/' ,__FILE__ ) . $path, [], FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/' . $path ) );
+    }
+
 
     $metas = array_map( function( $value ) {
         return $value[0];
@@ -397,33 +424,37 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
 
     if ( !$search->have_posts() ) { return; }
 
-    $template = function($name) {
+    $get_template = function($name, $is_part = true) {
         static $cached = [];
         if ( isset( $cached[ $name ] ) ) { return $cached[ $name ]; }
-        $template = file_get_contents( __DIR__.'/templates/'.$name.'.html' );
-        if ( $template === false ) { return; }
-        $cached[ $name ] = $template;
-        return $cached[ $name ];
+        if ( ( $template = file_get_contents( __DIR__.'/templates/'.($is_part ? 'part/' : '').$name.'.html' ) ) === false ) { return ''; }
+        return ( $cached[ $name ] = $template );
     };
-    $format = function($params, $template_name) use ($template) { // ++refactor
-        if ( empty( $params ) ) { return []; }
-        return strtr( $template( $template_name ), array_reduce( array_keys( $params ), function( $result, $item ) use ( $params ) {
-            $result[ '%'.$item ] = $params[ $item ];
+    $fill_template = function($params_merged, $template_name, $is_part = true) use ($get_template) {
+        return strtr( $get_template( $template_name, $is_part ), array_reduce( array_keys( $params_merged ), function( $result, $item ) use ( $params_merged ) {
+            $result[ '%'.$item ] = $params_merged[ $item ];
             return $result;
         }, [] ) );
     };
 
+    $params_initial = [];
     $params = [];
-    $param_add = function( $key, $fill = true ) use ( $format, &$params ) { //++rename so it says that it loads the template
-        $add = function($key) use ($format, &$params, $fill) { $params[ $key ] = ( $fill ? $format( $params, $key ) : '' ); };
-        if ( is_array( $key ) ) {
-            foreach( $key as $v ) { $add( $v ); }
+    $param_add = function( $key, $conditions = true ) use ( $fill_template, $params_initial, &$params ) {
+        $add = function($key) use ($fill_template, $params_initial, &$params, $conditions) {
+            $params[ $key ] = $conditions ? $fill_template( $params_initial+$params, $key ) : '';
+            ksort( $params, SORT_STRING );
+        };
+        if ( !is_array( $key ) ) {
+            $add( $key );
             return;
         }
-        $add( $key );
+        foreach( $key as $v ) {
+            $add( $v );
+        }
     };
+
     $crop_excerpt = function($text, $length) {
-        if ( !$text || !is_numeric( $length ) ) { return $text; }
+        if ( !trim( $text ) || !is_numeric( $length ) ) { return ''; }
         $text = substr( $text, 0, $length );
         $text = rtrim( substr( $text, 0, strrpos( $text, ' ' ) ), ',.…!?&([{-_ "„“' ) . '…';
         return $text;
@@ -435,18 +466,21 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
         $p = $search->next_post();
 
         $categories = isset( $settings['hide-category'] ) ? [] : get_the_category( $p );
-//++ add filters like esc_url and esc_html
-        $params = [
+
+        $params_initial = [
             'id' => get_the_ID( $p ),
             'permalink' => get_permalink( $p ),
             'title' => get_the_title( $p ),
             'date' => isset( $settings['hide-date'] ) ? '' : get_the_date( '', $p ),
-            'excerpt' => isset( $settings['hide-excerpt'] ) ? '' : $crop_excerpt( get_the_excerpt( $p ), $settings['excerpt-length'] ),
-            'category' => empty( $categories ) ? '' : $categories[0]->name,
+            'excerpt' => isset( $settings['hide-excerpt'] ) ? '' : esc_html( $crop_excerpt( get_the_excerpt( $p ), $settings['excerpt-length'] ) ),
+            'category' => empty( $categories ) ? '' : esc_html( $categories[0]->name ),
             'category_link' => empty( $categories ) ? '' : get_category_link( $categories[0]->term_id ),
             'thumbnail' => $settings['thumbnail-size'] ? get_the_post_thumbnail( $p, $settings['thumbnail-size'] ) : '',
-            'readmore' => __( $settings['read-more-text'] ?: 'Read more' ),
+            'readmore' => esc_html( __( $settings['read-more-text'] ?: 'Read more' ) ),
         ];
+        ksort( $params_initial, SORT_STRING ); // avoid smaller replacing bigger parts ++test if DESC
+
+        $param_add( 'title' );
         $param_add( 'title_linked' );
         $param_add( 'date', $params['date'] );
         $param_add( 'excerpt', $params['excerpt'] );
@@ -454,12 +488,12 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
         $param_add( 'thumbnail_linked', $params['thumbnail'] );
         $param_add( 'button', !isset( $settings['hide-read-more'] ) );
 
-        ksort( $params, SORT_STRING ); // avoid smaller replacing bigger parts ++test if DESC
-        $posts[] = $params;
+        $posts[] = $params + $params_initial;
+        // ++ debug with print_r
     }
 
     $result = [
-        'headline' => $settings['headline'] ? $format( [ 'headline' => $settings['headline'] ], 'headline' ) : '',
+        'headline' => $settings['headline'] ? $fill_template( [ 'headline' => $settings['headline'] ], 'headline' ) : '',
         'css_class' => FCPPBK_SLUG . ' ' . FCPPBK_PREF.$settings['layout'] . ' ' . $settings['css-class'],
         'column' => '',
         'list' => '',
@@ -469,12 +503,12 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
     foreach ( $layouts as $k => $v ) {
         for ( $i = 0; $i < $v; $i++ ) {
             if ( !isset( $posts[ $ind ] ) ) { break 2; }
-            $result[ $k ] .= $format( $posts[ $ind ], $k );
+            $result[ $k ] .= $fill_template( $posts[ $ind ], $k );
             $ind++;
         }
     }
 
-    return $format( $result, $settings['layout'] );
+    return $fill_template( $result, $settings['layout'], false );
 
 });
 
@@ -542,6 +576,8 @@ add_action( 'admin_init', function() {
         return $a['t'];
     }, layout_options() );
 
+    $styling_options = styling_options();
+
     $thumbnail_sizes = wp_get_registered_image_subsizes(); //++full, ++no image
     $thumbnail_sizes = [ '' => 'No image', 'full' => 'Full' ] + array_reduce( array_keys( $thumbnail_sizes ), function( $result, $item ) use ( $thumbnail_sizes ) {
         $result[ $item ] = ucfirst( $item ) . ' ('.$thumbnail_sizes[$item]['width'].'x'.$thumbnail_sizes[$item]['height'].')';
@@ -558,6 +594,7 @@ add_action( 'admin_init', function() {
         $add_settings_field( 'Main color', 'color' ); // ++use wp default picker
         $add_settings_field( 'Secondary color', 'color' );
         $add_settings_field( 'Layout', 'select', [ 'options' => $layout_options ] );
+        $add_settings_field( 'Style', 'select', [ 'options' => $styling_options ] );
         $add_settings_field( 'Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ] ); // ++ make the comment work
         $add_settings_field( 'Thumbnail size', 'select', [ 'options' => $thumbnail_sizes ] );
         $add_settings_field( 'Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols' ] );
@@ -678,10 +715,9 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
-// ++default values on install if the settings field doesn't exist
-// ++shortcode attrs to override the default settings (pick particular & explain on the settings page)
 // make the layouts for both websites && apply to lanuwa?
-// ++style!! I want
+// add to both websites
+// ++shortcode attrs to override the default settings (pick particular & explain on the settings page)
 // ++sanitize admin values
 // ++sanitize before printing
 // ++polish for publishing
