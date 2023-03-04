@@ -5,14 +5,14 @@
 
     // --------------- fetch data
     const fetch_data = async field_name => {
+        const post_id = +$( '#post_ID' ).val(); // to exclude self ++maybe pass the argument to api to receive the proper server reply?
         return await fetch(
             `/wp-json/${slug}/v1/${field_name}/` + encodeURI( $( `#${prefix}${field_name}` ).val().trim() ),
             { headers: {
                 'X-WP-Nonce' : $( `#${prefix}rest-nonce` ).val()
             } })
         .then( response => response.status === 200 && response.json() || [] )
-        .then( data => data || [] );
-
+        .then( data => data.filter( el => el.id !== post_id ) || [] );
     };
 
     // --------------- tabs
