@@ -19,12 +19,9 @@ defined( 'ABSPATH' ) || exit;
 define( 'FCPPBK_SLUG', 'fcppbk' );
 define( 'FCPPBK_PREF', FCPPBK_SLUG.'-' );
 
-define( 'FCPPBK_DEV', false );
+define( 'FCPPBK_DEV', true );
 define( 'FCPPBK_VER', get_file_data( __FILE__, [ 'ver' => 'Version' ] )[ 'ver' ] . ( FCPPBK_DEV ? time() : '' ) );
 
-function get_search_post_types() { // ++replace with the option value
-    return ['page'];
-}
 function layout_options($list_length = 0) {
     $list_length = is_numeric( $list_length ) ? $list_length : 10;
     return [
@@ -65,12 +62,12 @@ function layout_options($list_length = 0) {
 // admin interface
 add_action( 'add_meta_boxes', function() {
     if ( !current_user_can( 'administrator' ) ) { return; }
-    list( 'public' => $public_post_types ) = get_all_post_types();
+    if ( empty( apply_to_post_types() ) ) { return; }
     add_meta_box(
         'fcp-posts-by-query',
         'Posts by Query',
         __NAMESPACE__.'\metabox_query',
-        array_keys( $public_post_types ),
+        apply_to_post_types(),
         'normal',
         'low'
     );
@@ -106,11 +103,14 @@ add_action( 'admin_enqueue_scripts', function() {
 // api to fetch the query
 add_action( 'rest_api_init', function () {
 
-    $settings = get_option( FCPPBK_PREF.'settings' );
-    $route_args = function($results_format) use ($settings) {
+    $route_args = function($results_format) {
+
+        if ( empty( select_from_post_types() ) ) {
+            return new \WP_Error( 'post_type_not_selected', 'Post type not selected', [ 'status' => 404 ] );
+        }
 
         $wp_query_args = [
-            'post_type' => $settings['select-from'],
+            'post_type' => select_from_post_types(),
             'post_status' => 'publish',
             //'sentence' => true,
             'posts_per_page' => 20,
@@ -120,17 +120,15 @@ add_action( 'rest_api_init', function () {
             return [ 'id' => $p->ID, 'title' => $p->post_title ]; // get_the_title() forces different quotes in different languages or so
         };
 
-
         switch ( $results_format ) {
             case ( 'list' ):
                 // $wp_query_args += [ 'orderby' => 'title', 'order' => 'ASC' ]; // autocomplete orders by title anyways
             break;
             case ( 'query' ):
-                $wp_query_args['post_type'] = ['post'];
                 $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC' ];
                 $format_output = function( $p ) {
                     $date = wp_date( get_option( 'date_format', 'j F Y' ), strtotime( $p->post_date ) );
-                    return [ 'id' => $p->ID, 'title' => '('.$date.') ' . $p->post_title ];
+                    return [ 'id' => $p->ID, 'title' => $p->post_title . ' ('.public_post_types()[$p->post_type].', '.$date.')' ];
                 };
             break;
         }
@@ -153,7 +151,7 @@ add_action( 'rest_api_init', function () {
                     $result[] = $format_output( $p ); // not using the id as the key to keep the order in json
                 }
     
-                $result = new \WP_REST_Response( (object) $result, 200 );
+                $result = new \WP_REST_Response( $result, 200 );
     
                 if ( FCPPBK_DEV ) { nocache_headers(); }
     
@@ -234,11 +232,9 @@ function metabox_query() {
         $result = [];
         if ( !empty( $ids ) ) {
 
-            $settings = get_option( FCPPBK_PREF.'settings' );
-
             $search = new \WP_Query( [
-                'post_type' => $settings['select-from'],
-                'post_status' => 'publish',
+                //'post_type' => select_from_post_types(), // commented to keep on accident save. filter still works in shortcode
+                //'post_status' => 'publish', // same
                 'post__in' => $ids,
                 'orderby' => 'post__in',
             ] );
@@ -266,28 +262,35 @@ function metabox_query() {
 }
 
 
-function get_all_post_types() {
-    static $all = [], $public = [], $archive = [];
+function public_post_types() {
+    static $store = [];
 
-    if ( !empty( $public ) ) { return [ 'all' => $all, 'public' => $public, 'archive' => $archive ]; }
+    if ( !empty( $store ) ) { return $store; }
 
     $all = get_post_types( [], 'objects' );
-    $public = [];
-    $archive = [];
-    $archive[ 'blog' ] = 'Blog';
-    usort( $all, function($a,$b) { return strcasecmp( $a->label, $b->label ); });
     foreach ( $all as $type ) {
-        $type->name = $type->rewrite->slug ?? $type->name;
-        if ( $type->has_archive ) {
-            $archive[ $type->name ] = $type->label;
-        }
-        if ( $type->public ) {
-            $public[ $type->name ] = $type->label;
-        }
+        if ( !$type->public ) { continue; }
+        $slug = $type->rewrite->slug ?? $type->name;
+        $store[ $slug ] = $type->label;
     }
 
-    return [ 'all' => $all, 'public' => $public, 'archive' => $archive ];
+    asort( $store, SORT_STRING );
 
+    return $store;
+}
+
+function get_settings() {
+    static $settings = [];
+    if ( !empty( $settings ) ) { return $settings; }
+    $settings = get_option( FCPPBK_PREF.'settings' );
+    return $settings;
+}
+
+function apply_to_post_types() {
+    return array_intersect( array_keys( public_post_types() ), get_settings()['apply-to'] ?? [] );
+}
+function select_from_post_types() {
+    return array_intersect( array_keys( public_post_types() ), get_settings()['select-from'] ?? [] );
 }
 
 // save meta data
@@ -334,9 +337,12 @@ function sanitize_meta( $value, $field, $postID ) {
     return '';
 }
 
-add_shortcode( FCPPBK_SLUG, function() {
+add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
 
-    $settings = get_option( FCPPBK_PREF.'settings' );
+    if ( empty( select_from_post_types() ) ) { return; }
+    if ( !in_array( get_post_type(), apply_to_post_types() ) ) { return; }
+
+    $settings = get_settings();
 
     $style_path_end = 'styles/'.$settings['layout'].'.css';
     if ( is_file( __DIR__.'/' . $style_path_end ) ) {
@@ -365,15 +371,16 @@ add_shortcode( FCPPBK_SLUG, function() {
     }, 0 );
 
     $wp_query_args = [
-        'post_type' => $settings['select-from'],
+        'post_type' => select_from_post_types(),
         'post_status' => 'publish',
         'posts_per_page' => $limit,
+        'post__not_in' => [ get_the_ID() ],
     ];
 
     $results_format = $metas[ FCPPBK_PREF.'variants' ];
     switch ( $results_format ) {
         case ( 'list' ):
-            $ids = unserialize( $metas[ FCPPBK_PREF.'posts' ] ); // ++ filter by post-type & is-published
+            $ids = unserialize( $metas[ FCPPBK_PREF.'posts' ] );
             if ( empty( $ids ) ) { return; }
             $wp_query_args += [ 'post__in' => $ids, 'orderby' => 'post__in' ];
         break;
@@ -541,8 +548,6 @@ add_action( 'admin_init', function() {
         return $result;
     }, [] );
 
-    list( 'public' => $public_post_types ) = get_all_post_types();
-
     // structure of fields
     $settings->section = 'description';
 	add_settings_section( $settings->section, 'Description', '', $settings->page );
@@ -569,8 +574,8 @@ add_action( 'admin_init', function() {
     add_settings_section( $settings->section, 'Other settings', '', $settings->page );
         $add_settings_field( 'Headline', 'text' );
         $add_settings_field( 'CSS Class', 'text' );
-        $add_settings_field( 'Select from', 'checkboxes', [ 'options' => $public_post_types ] );
-        $add_settings_field( 'Apply to', 'checkboxes', [ 'options' => $public_post_types, 'comment' => 'This will add the option to query the posts to selected post types editor bottom' ] );
+        $add_settings_field( 'Select from', 'checkboxes', [ 'options' => public_post_types() ] );
+        $add_settings_field( 'Apply to', 'checkboxes', [ 'options' => public_post_types(), 'comment' => 'This will add the option to query the posts to selected post types editor bottom' ] );
         //$add_settings_field( 'Defer style', 'checkbox', [ 'option' => '1', 'label' => 'defer the render blocking style.css', 'comment' => 'If you use a caching plugin, most probably it fulfulls the role of this checkbox' ] );
 
     register_setting( FCPPBK_PREF.'settings-group1', $settings->varname, __NAMESPACE__.'\sanitize_settings' ); // register, save, nonce
@@ -673,11 +678,9 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
-// the rest of settings
-// ++!!! the post must not be itself !!!
-// ++shortcode attrs to override the default settings
+// ++default values on install if the settings field doesn't exist
+// ++shortcode attrs to override the default settings (pick particular & explain on the settings page)
 // make the layouts for both websites && apply to lanuwa?
-// ++default values on install?
 // ++style!! I want
 // ++sanitize admin values
 // ++sanitize before printing
@@ -701,3 +704,4 @@ function sanitize_settings( $options ){
 // ++ drag and drop to change the order of particular posts
 // ++ use wp checked()
 // ++ preview using 1-tile layout && api
+// ++ nothing found message to advisor if nothing found
