@@ -427,22 +427,21 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
     $get_template = function($name, $is_part = true) {
         static $cached = [];
         if ( isset( $cached[ $name ] ) ) { return $cached[ $name ]; }
-        if ( ( $template = file_get_contents( __DIR__.'/templates/'.($is_part ? 'part/' : '').$name.'.html' ) ) === false ) { return ''; }
+        if ( ( $template = file_get_contents( __DIR__.'/templates/'.($is_part ? 'parts/' : '').$name.'.html' ) ) === false ) { return ''; }
         return ( $cached[ $name ] = $template );
     };
-    $fill_template = function($params_merged, $template_name, $is_part = true) use ($get_template) {
-        return strtr( $get_template( $template_name, $is_part ), array_reduce( array_keys( $params_merged ), function( $result, $item ) use ( $params_merged ) {
-            $result[ '%'.$item ] = $params_merged[ $item ];
+    $fill_template = function($params, $template_name, $is_part = true) use ($get_template) {
+        return strtr( $get_template( $template_name, $is_part ), array_reduce( array_keys( $params ), function( $result, $item ) use ( $params ) {
+            $result[ '%'.$item ] = $params[ $item ];
             return $result;
         }, [] ) );
     };
 
     $params_initial = [];
     $params = [];
-    $param_add = function( $key, $conditions = true ) use ( $fill_template, $params_initial, &$params ) {
+    $param_add = function( $key, $conditions = true ) use ( $fill_template, &$params_initial, &$params ) {
         $add = function($key) use ($fill_template, $params_initial, &$params, $conditions) {
-            $params[ $key ] = $conditions ? $fill_template( $params_initial+$params, $key ) : '';
-            ksort( $params, SORT_STRING );
+            $params[ $key ] = $conditions ? $fill_template( $params_initial, $key ) : '';
         };
         if ( !is_array( $key ) ) {
             $add( $key );
@@ -480,16 +479,15 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
         ];
         ksort( $params_initial, SORT_STRING ); // avoid smaller replacing bigger parts ++test if DESC
 
-        $param_add( 'title' );
         $param_add( 'title_linked' );
-        $param_add( 'date', $params['date'] );
-        $param_add( 'excerpt', $params['excerpt'] );
-        $param_add( 'category_linked', $params['category'] && $params['category_link'] );
-        $param_add( 'thumbnail_linked', $params['thumbnail'] );
+        $param_add( 'title_linked_formatted' );
+        $param_add( 'date_formatted', $params_initial['date'] );
+        $param_add( 'excerpt_formatted', $params_initial['excerpt'] );
+        $param_add( 'category_linked_formatted', $params_initial['category'] && $params_initial['category_link'] );
+        $param_add( 'thumbnail_linked', $params_initial['thumbnail'] );
         $param_add( 'button', !isset( $settings['hide-read-more'] ) );
-
+        //return '<pre>'.print_r( $params + $params_initial, true ).'</pre>';
         $posts[] = $params + $params_initial;
-        // ++ debug with print_r
     }
 
     $result = [
