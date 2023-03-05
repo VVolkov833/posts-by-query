@@ -379,7 +379,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
 
     $path = 'styling-options/'.$settings['style'].'.css';
     $handle = FCPPBK_PREF.'style';
-    if ( is_file( __DIR__.'/' . $path ) ) {
+    if ( $settings['layout'] !== '1-list' && is_file( __DIR__.'/' . $path ) ) {
         wp_enqueue_style( $handle, plugins_url( '/' ,__FILE__ ) . $path, [], FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/' . $path ) );
     }
 
@@ -714,6 +714,7 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
+// add exceptions when not to load style?
 // make the layouts for both websites && apply to lanuwa?
 // add to both websites
 // ++shortcode attrs to override the default settings (pick particular & explain on the settings page)
@@ -740,3 +741,4 @@ function sanitize_settings( $options ){
 // ++ use wp checked()
 // ++ preview using 1-tile layout && api
 // ++ nothing found message to advisor if nothing found
+// override global with shortcode attributes and all with local on-page meta settings
