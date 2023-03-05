@@ -471,6 +471,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
             'permalink' => get_permalink( $p ),
             'title' => get_the_title( $p ),
             'date' => isset( $settings['hide-date'] ) ? '' : get_the_date( '', $p ),
+            'datetime_attr' => isset( $settings['hide-date'] ) ? '' : get_the_date( 'Y-m-d', $p ),
             'excerpt' => isset( $settings['hide-excerpt'] ) ? '' : esc_html( $crop_excerpt( get_the_excerpt( $p ), $settings['excerpt-length'] ) ),
             'category' => empty( $categories ) ? '' : esc_html( $categories[0]->name ),
             'category_link' => empty( $categories ) ? '' : get_category_link( $categories[0]->term_id ),
