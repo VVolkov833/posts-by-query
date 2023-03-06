@@ -715,28 +715,27 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
+// textarea with the editor with additional css
 // add to both websites
 // ++sanitize admin values
 // ++sanitize before printing
 // ++polish for publishing
     // excape everything before printing
 // ++defaault image
+// ++hide thumbnail
 // ++add a global function to print?
 // ++option to print automatically?
     // ++is it allowed to make the gutenberg block??
-// ++check the plugins on reis - what minifies the jss?
-// ++array_unique before saving.. just so is
-// ++2 more styles? check the todo
+// ++check the plugins on reis - what minifies the jss? is it raidboxes settings?
+// ++more styles
 // ++maybe an option with schema?
 // ++abort previous fetch if new one is here
 // ++some hints how it will work
 /* admin settings
     only admin checkbox (or anyone, who can edit the post)
     get the first image if no featured
-    tiles per row?
 */
 // ++ drag and drop to change the order of particular posts
-// ++ use wp checked()
 // ++ preview using 1-tile layout && api
 // ++ nothing found message to advisor if nothing found
 // override global with shortcode attributes and all with local on-page meta settings
