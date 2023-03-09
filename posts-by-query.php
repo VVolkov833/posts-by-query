@@ -119,6 +119,14 @@ add_action( 'admin_enqueue_scripts', function() {
         if ( $ext === 'js' ) { wp_enqueue_script( $handle, $url, [], FCPPBK_VER, false ); }
     }
 
+    $cm_settings['codeEditor'] = wp_enqueue_code_editor( ['type' => 'text/css'] );
+    //print_r( $cm_settings ); exit;
+    wp_localize_script( 'jquery', 'cm_settings', $cm_settings );
+    wp_enqueue_script( 'wp-theme-plugin-editor' );
+    wp_add_inline_script( 'wp-theme-plugin-editor', file_get_contents( __DIR__ . '/assets/inline/codemirror-init.js') );
+    wp_enqueue_style( 'wp-codemirror' );
+    wp_add_inline_style( 'wp-codemirror', '.CodeMirror{max-width:680px;height:100px}' );
+
 });
 
 // api to fetch the posts
@@ -384,6 +392,13 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
         wp_enqueue_style( $handle, plugins_url( '/' ,__FILE__ ) . $path, [], FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/' . $path ) );
     }
 
+    $handle = FCPPBK_PREF.'additional';
+    if ( $settings['additional-css'] ?? trim( $settings['additional-css'] ) ) {
+        wp_register_style( $handle, false );
+        wp_enqueue_style( $handle );
+        wp_add_inline_style( $handle, $settings['additional-css'] );
+    }
+
 
     $metas = array_map( function( $value ) {
         return $value[0];
@@ -546,7 +561,7 @@ add_action( 'admin_init', function() {
 
     $add_settings_field = function( $title, $type = '', $atts = [] ) use ( $settings ) { // $atts: placeholder, options, option, step
 
-        $types = [ 'text', 'radio', 'checkbox', 'checkboxes', 'select', 'color', 'number', 'comment' ];
+        $types = [ 'text', 'textarea', 'radio', 'checkbox', 'checkboxes', 'select', 'color', 'number', 'comment' ];
         $type = ( empty( $type ) || !in_array( $type, $types ) ) ? $types[0] : $type;
         $function = __NAMESPACE__.'\\'.$type;
         if ( !function_exists( $function ) ) { return; }
@@ -561,6 +576,8 @@ add_action( 'admin_init', function() {
             'option' => $atts['option'] ?? '',
             'label' => $atts['label'] ?? '',
             'comment' => $atts['comment'] ?? '',
+            'rows' => 10,
+            'cols' => 50,
         ];
 
         add_settings_field(
@@ -595,6 +612,7 @@ add_action( 'admin_init', function() {
         $add_settings_field( 'Secondary color', 'color' );
         $add_settings_field( 'Layout', 'select', [ 'options' => $layout_options ] );
         $add_settings_field( 'Style', 'select', [ 'options' => $styling_options ] );
+        $add_settings_field( 'Additional CSS', 'textarea' );
         $add_settings_field( 'Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ] ); // ++ make the comment work
         $add_settings_field( 'Thumbnail size', 'select', [ 'options' => $thumbnail_sizes ] );
         $add_settings_field( 'Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols' ] );
@@ -636,6 +654,20 @@ function number($a) { text( $a, 'number' ); }
 
 function comment($a) {
     echo wp_filter_kses( $a->comment );
+}
+
+function textarea($a) {
+    ?>
+    <textarea
+        name="<?php echo esc_attr( $a->name ) ?>"
+        id="<?php echo esc_attr( $a->id ?? $a->name ) ?>"
+        placeholder="<?php echo esc_attr( $a->placeholder ?? '' ) ?>"
+        class="<?php echo esc_attr( $a->className ?? '' ) ?>"
+        rows="<?php echo esc_attr( $a->rows ) ?>"
+        cols="<?php echo esc_attr( $a->cols ) ?>"
+    ><?php echo esc_textarea( $a->value ?? '' ) ?></textarea>
+    <?php echo isset( $a->comment ) ? '<p><em>'.esc_html( $a->comment ).'</em></p>' : '' ?>
+    <?php
 }
 
 function select($a) {
@@ -715,27 +747,27 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
-// textarea with the editor with additional css
-// add to both websites
+// thumbnail dummy
+    // https://jeroensormani.com/how-to-include-the-wordpress-media-selector-in-your-plugin/
+// ++abort previous fetch if new one is here
+// ++ nothing found message to advisor if nothing found
 // ++sanitize admin values
 // ++sanitize before printing
 // ++polish for publishing
     // excape everything before printing
-// ++defaault image
-// ++hide thumbnail
+// add to both websites
 // ++add a global function to print?
 // ++option to print automatically?
     // ++is it allowed to make the gutenberg block??
-// ++check the plugins on reis - what minifies the jss? is it raidboxes settings?
 // ++more styles
 // ++maybe an option with schema?
-// ++abort previous fetch if new one is here
 // ++some hints how it will work
 /* admin settings
     only admin checkbox (or anyone, who can edit the post)
     get the first image if no featured
+    mode for preview only
 */
 // ++ drag and drop to change the order of particular posts
 // ++ preview using 1-tile layout && api
-// ++ nothing found message to advisor if nothing found
 // override global with shortcode attributes and all with local on-page meta settings
+    // ++make multiple in terms of css
