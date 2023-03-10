@@ -98,7 +98,7 @@ add_action( 'add_meta_boxes', function() {
 add_action( 'admin_enqueue_scripts', function() {
 
     if ( !current_user_can( 'administrator' ) ) { return; }
-    $files = [ 'post' => [ 'metabox', 'advisor' ], 'settings_page_posts-by-query' => [ 'settings' ] ];
+    $files = [ 'post' => [ 'metabox', 'advisor' ], 'settings_page_posts-by-query' => [ 'settings', 'codemirror', 'media' ] ];
     $screen = get_current_screen();
     if ( !isset( $screen ) || !is_object( $screen ) || !isset( $files[ $screen->base ] ) ) { return; }
 
@@ -119,14 +119,13 @@ add_action( 'admin_enqueue_scripts', function() {
         if ( $ext === 'js' ) { wp_enqueue_script( $handle, $url, [], FCPPBK_VER, false ); }
     }
 
-    $cm_settings['codeEditor'] = wp_enqueue_code_editor( ['type' => 'text/css'] );
-    //print_r( $cm_settings ); exit;
-    wp_localize_script( 'jquery', 'cm_settings', $cm_settings );
+    // the css editor
+    wp_localize_script( 'jquery', 'cm_settings', [ 'codeEditor' => wp_enqueue_code_editor( ['type' => 'text/css'] ) ] );
     wp_enqueue_script( 'wp-theme-plugin-editor' );
-    wp_add_inline_script( 'wp-theme-plugin-editor', file_get_contents( __DIR__ . '/assets/inline/codemirror-init.js') );
     wp_enqueue_style( 'wp-codemirror' );
-    wp_add_inline_style( 'wp-codemirror', '.CodeMirror{max-width:680px;height:100px}' );
 
+    // the media popup main
+    wp_enqueue_media();
 });
 
 // api to fetch the posts
@@ -482,6 +481,12 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
 
         $categories = isset( $settings['hide-category'] ) ? [] : get_the_category( $p );
 
+		$thumbnail = $settings['thumbnail-size'] ? (
+			get_the_post_thumbnail( $p, $settings['thumbnail-size'] )
+            ?: wp_get_attachment_image( $settings['default-thumbnail'], $settings['thumbnail-size'] )
+            ?: '' // ++dummy image transparent svg with class-name & background in css
+		) : '';
+
         $params_initial = [
             'id' => get_the_ID( $p ),
             'permalink' => get_permalink( $p ),
@@ -491,7 +496,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
             'excerpt' => isset( $settings['hide-excerpt'] ) ? '' : esc_html( $crop_excerpt( get_the_excerpt( $p ), $settings['excerpt-length'] ) ),
             'category' => empty( $categories ) ? '' : esc_html( $categories[0]->name ),
             'category_link' => empty( $categories ) ? '' : get_category_link( $categories[0]->term_id ),
-            'thumbnail' => $settings['thumbnail-size'] ? get_the_post_thumbnail( $p, $settings['thumbnail-size'] ) : '',
+            'thumbnail' => $thumbnail,
             'readmore' => esc_html( __( $settings['read-more-text'] ?: 'Read more' ) ),
         ];
         ksort( $params_initial, SORT_STRING ); // avoid smaller replacing bigger parts ++test if DESC
@@ -561,7 +566,7 @@ add_action( 'admin_init', function() {
 
     $add_settings_field = function( $title, $type = '', $atts = [] ) use ( $settings ) { // $atts: placeholder, options, option, step
 
-        $types = [ 'text', 'textarea', 'radio', 'checkbox', 'checkboxes', 'select', 'color', 'number', 'comment' ];
+        $types = [ 'text', 'color', 'number', 'textarea', 'radio', 'checkbox', 'checkboxes', 'select', 'comment', 'image' ];
         $type = ( empty( $type ) || !in_array( $type, $types ) ) ? $types[0] : $type;
         $function = __NAMESPACE__.'\\'.$type;
         if ( !function_exists( $function ) ) { return; }
@@ -572,12 +577,13 @@ add_action( 'admin_init', function() {
             'id' => $settings->varname . '--' . $slug,
             'value' => $slug ? ( $settings->values[ $slug ] ?? '' ) : '',
             'placeholder' => $atts['placeholder'] ?? '',
+            'className' => $atts['className'] ?? '',
             'options' => $atts['options'] ?? '',
             'option' => $atts['option'] ?? '',
             'label' => $atts['label'] ?? '',
             'comment' => $atts['comment'] ?? '',
-            'rows' => 10,
-            'cols' => 50,
+            'rows' => $atts['rows'] ?? 10,
+            'cols' => $atts['cols'] ?? 50,
         ];
 
         add_settings_field(
@@ -614,6 +620,7 @@ add_action( 'admin_init', function() {
         $add_settings_field( 'Style', 'select', [ 'options' => $styling_options ] );
         $add_settings_field( 'Additional CSS', 'textarea' );
         $add_settings_field( 'Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ] ); // ++ make the comment work
+        $add_settings_field( 'Default thumbnail', 'image', [ 'comment' => 'This image is shown, if a post doesn\'t have the featured image', 'className' => 'image' ] );
         $add_settings_field( 'Thumbnail size', 'select', [ 'options' => $thumbnail_sizes ] );
         $add_settings_field( 'Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols' ] );
         $add_settings_field( '"Read more" text', 'text', [ 'placeholder' => __( 'Read more' ) ] );
@@ -730,6 +737,23 @@ function radio($a) { // make like others or add the exception
         value="<?php echo esc_attr( $a->value ) ?>"
         <?php checked( $a->checked === $a->value || ($a->default ?? false) && !$checked_once, true ) ?>
     >
+    <?php echo isset( $a->comment ) ? '<p><em>'.esc_html( $a->comment ).'</em></p>' : '' ?>
+    <?php
+}
+
+function image($a) {
+    ?>
+    <input type="hidden"
+        name="<?php echo esc_attr( $a->name ) ?>"
+        id="<?php echo esc_attr( $a->id ?? $a->name ) ?>"
+        value="<?php echo esc_attr( $a->value ?? '' ) ?>"
+    />
+    <button type="button"
+        id="<?php echo esc_attr( $a->id ?? $a->name ).'-pick' ?>"
+        class="<?php echo esc_attr( $a->className ?? '' ) ?>"
+    >
+        <?php echo ( isset( $a->value ) && is_numeric( $a->value ) ) ? ( wp_get_attachment_image( $a->value, 'thumbnail' ) ?: __('No') ) : __('No') ?>
+    </button>
     <?php echo isset( $a->comment ) ? '<p><em>'.esc_html( $a->comment ).'</em></p>' : '' ?>
     <?php
 }
