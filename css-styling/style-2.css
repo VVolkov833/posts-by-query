@@ -20,6 +20,9 @@
     object-fit: cover;
     object-position: center top;
 }
+.fcppbk-thumbnail img.blank {
+    background-color: var(--main-color);
+}
 
 .fcppbk header > * {
     margin: 0 0 15px;

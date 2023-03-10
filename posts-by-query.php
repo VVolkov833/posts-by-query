@@ -484,7 +484,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
 		$thumbnail = $settings['thumbnail-size'] ? (
 			get_the_post_thumbnail( $p, $settings['thumbnail-size'] )
             ?: wp_get_attachment_image( $settings['default-thumbnail'], $settings['thumbnail-size'] )
-            ?: '' // ++dummy image transparent svg with class-name & background in css
+            ?: '<img src="data:image/svg+xml,%3Csvg width=\'16\' height=\'16\' version=\'1.1\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3C/svg%3E" class="blank">'
 		) : '';
 
         $params_initial = [
