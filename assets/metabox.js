@@ -7,7 +7,6 @@
     const fetch_data = async ( field_name, controller ) => {
         const query = $( `#${prefix}${field_name}` ).val().trim();
         const post_id = +$( '#post_ID' ).val(); // to exclude self
-        console.log( query + '...' );
         return await fetch(
             `/wp-json/${slug}/v1/${field_name}/` + encodeURI( query ),
             {
@@ -17,8 +16,8 @@
             }
         )
         .then( response => response.status === 200 && response.json() || [] )
-        .then( data => { console.log( query + '!!!' ); console.log( (data?.filter( el => el.id !== post_id ) || []).length ); return data?.filter( el => el.id !== post_id ) || [] } )
-        .catch( e => { console.log( query + ' ' + e.name ); return [] }); //++ keep only the return part
+        .then( data => data?.filter( el => el.id !== post_id ) || [] )
+        .catch( error => [] );
     };
 
     // --------------- tabs

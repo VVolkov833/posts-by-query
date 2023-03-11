@@ -173,7 +173,7 @@ add_action( 'rest_api_init', function () {
                 $search = new \WP_Query( $wp_query_args );
     
                 if ( !$search->have_posts() ) {
-                    return new \WP_Error( 'nothing_found', 'No results found', [ 'status' => 404 ] );
+                    return new \WP_REST_Response( [], 200 ); // new \WP_Error( 'nothing_found', 'No results found', [ 'status' => 404 ] );
                 }
     
                 $result = [];
@@ -189,9 +189,9 @@ add_action( 'rest_api_init', function () {
                 return $result;
             },
             'permission_callback' => function() {
-                //if ( empty( $_SERVER['HTTP_REFERER'] ) ) { return false; }
-                //if ( strtolower( parse_url( $_SERVER['HTTP_REFERER'], PHP_URL_HOST ) ) !== strtolower( $_SERVER['HTTP_HOST'] ) ) { return false; }
-                //if ( !current_user_can( 'administrator' ) ) { return false; } // works only with X-WP-Nonce header passed
+                if ( empty( $_SERVER['HTTP_REFERER'] ) ) { return false; }
+                if ( strtolower( parse_url( $_SERVER['HTTP_REFERER'], PHP_URL_HOST ) ) !== strtolower( $_SERVER['HTTP_HOST'] ) ) { return false; }
+                if ( !current_user_can( 'administrator' ) ) { return false; } // works only with X-WP-Nonce header passed
                 return true;
             },
             'args' => [
@@ -773,8 +773,7 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
-// ++ advisor - show full list option as the content, not the title, might contain the correct value
-// ++abort previous fetch if new one is here
+// loading
 // ++check if wp codemirror has the format function inside
 // ++sanitize admin values
     // default values to avoid double black or so
@@ -782,8 +781,6 @@ function sanitize_settings( $options ){
 // ++polish for publishing
     // excape everything before printing
     // fix && prepare the texts
-// ++ nothing found message to advisor if nothing found, loading sign
-// ++ avoid 404 in api, just erturn empty on empty or not existing - let the front handle it
 // add to both websites
 // ++add a global function to print?
 // ++option to print automatically?

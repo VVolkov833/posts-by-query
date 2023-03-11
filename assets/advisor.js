@@ -2,7 +2,9 @@
 function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
 
     const $ = jQuery,
-        css_class = 'fcp-advisor-holder';
+        css_prefix = 'fcp-advisor-',
+        css_class = css_prefix+'holder',
+        css_status_class = css_prefix+'holder-status';
     let init_val = '';
 
     if ( !$input || !$input instanceof $ || !arr ) { return }
@@ -37,20 +39,46 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
         }
         if ( e.key === 'Enter' || e.key === 'Tab' ) {
             list_holder_remove();
+            loading_status_remove();
             func( $input.val() );
             return;
         }
         if ( e.key === 'Escape' ) {
             $input.val( init_val );
             list_holder_remove();
+            loading_status_remove();
         }
+    });
+    $input.on( 'blur', function() {
+        loading_status_remove();
     });
 
     function $holder() {
-        return $input.next( '.' + css_class );
+        return $input.nextAll( '.' + css_class );
     }
     function $active() {
         return $holder().children( '.active' );
+    }
+
+    function loading_status_add( status ) {
+        loading_status_remove();
+        const width = $input.outerWidth(),
+            height = $input.outerHeight(),
+            position = $input.position();
+
+        $input.after( $( '<div>', {
+            'class': css_status_class,
+            'style': 'left:' + ( position.left + width - height ) + 'px;'
+                     + 'top:' + position.top + 'px;'
+                     + 'width:' + height + 'px;'
+                     + 'height:' + height + 'px;'
+        }));
+
+        if ( !status ) { return; }
+        $input.nextAll( '.' + css_status_class )[0].classList.add( 'fcp-advisor-'+status );
+    }
+    function loading_status_remove() {
+        $input.nextAll( '.' + css_status_class ).remove();
     }
 
     function list_holder_add() {
@@ -62,10 +90,10 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
 
         $input.after( $( '<div>', {
             'class': css_class,
-            'style': 'left:' + position.left + 'px;' +
-                     'top:' + ( position.top + height ) + 'px;' +
-                     'width:' + width + 'px;'
-        }) );
+            'style': 'left:' + position.left + 'px;'
+                     + 'top:' + ( position.top + height ) + 'px;'
+                     + 'width:' + width + 'px;'
+        }));
 
         document.addEventListener( 'click', list_holder_remove ); // blur event doesn't pass through the click
         
@@ -97,18 +125,21 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
 
         const value = $input.val().trim().toLowerCase();
         let list = [];
-        console.log( '~~'+value+'...' );
+        let aborted = false;
+        let fail = setTimeout(()=>{});
         if ( typeof arr === 'function' ) {
+            loading_status_add( 'loading' );
             controller.abort();
             controller = new AbortController();
+            controller.signal.onabort = () => aborted = true;
             list = await arr( controller );
-            console.log( '~~'+value+' !!!' );
+            fail = aborted && setTimeout(()=>{}) || setTimeout( () => loading_status_add( 'failed' ) );
         } else
         if ( Array.isArray( arr ) ) {
             list = arr;
         }
-        
-        if ( !list.length === 0 ) { return }
+
+        if ( list.length === 0 ) { return }
 
         let exclude = options?.exclude || [];
         exclude = typeof exclude === 'function' ? exclude() : exclude;
@@ -117,7 +148,7 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
             return !exclude.includes(a);
         });
 
-        if ( !list.length === 0 ) { return }
+        if ( list.length === 0 ) { return }
 
         let arr_low = list.map( a => {
             return a
@@ -129,22 +160,25 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
 
         let primary = [], secondary = [], tertiary = [];
         for ( let i = 0, j = arr_low.length; i < j; i++ ) {
-            if ( arr_low[i].indexOf( value ) === 0 ) { // the entry is the first words
+            if ( arr_low[i].indexOf( value ) === 0 ) { // the haystack starts with the needle
                 primary.push( '<button tabindex="-1">'+list[i]+'</button>' );
                 continue;
             }
-            if ( arr_low[i].indexOf( value ) > 0 && options?.full ) { // the entry is in the line
+            if ( arr_low[i].indexOf( value ) > 0 && options?.full ) { // the haystack contains the needle
                 secondary.push( '<button tabindex="-1">'+list[i]+'</button>' );
                 continue;
             }
 
-            if ( !options?.all_correct ) { break; } // all entries fit by default
+            if ( !options?.all_correct ) { break; } // the haystack doesn't contain the needle, all the entries fit
             tertiary.push( '<button tabindex="-1">'+list[i]+'</button>' );
         }
 
         let content = [ ...primary, ...secondary, ...tertiary ].slice( 0, ( options?.lines || 5 ) );
         
-        if ( !content.length ) { return }
+        if ( content.length === 0 ) { return }
+
+        clearTimeout( fail );
+        loading_status_add( 'success' );
 
         if ( !$holder().length ) {
             list_holder_add();
