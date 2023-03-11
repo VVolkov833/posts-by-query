@@ -4,15 +4,20 @@
           prefix = slug + '-';
 
     // --------------- fetch data
-    const fetch_data = async field_name => {
-        const post_id = +$( '#post_ID' ).val(); // to exclude self ++maybe pass the argument to api to receive the proper server reply?
+    const fetch_data = async ( field_name, controller ) => {
+        const query = $( `#${prefix}${field_name}` ).val().trim();
+        const post_id = +$( '#post_ID' ).val(); // to exclude self
         return await fetch(
-            `/wp-json/${slug}/v1/${field_name}/` + encodeURI( $( `#${prefix}${field_name}` ).val().trim() ),
-            { headers: {
-                'X-WP-Nonce' : $( `#${prefix}rest-nonce` ).val()
-            } })
+            `/wp-json/${slug}/v1/${field_name}/` + encodeURI( query ),
+            {
+                method: 'get',
+                headers: { 'X-WP-Nonce' : $( `#${prefix}rest-nonce` ).val() },
+                signal: controller.signal,
+            }
+        )
         .then( response => response.status === 200 && response.json() || [] )
-        .then( data => data.filter( el => el.id !== post_id ) || [] );
+        .then( data => data?.filter( el => el.id !== post_id ) || [] )
+        .catch( e => { console.log( query + ' ' + e.name ); return [] }); //++ keep only the return part
     };
 
     // --------------- tabs
@@ -85,10 +90,13 @@
     (() => {
         const $input = $( `#${prefix}query` );
         const $target = $( `#${prefix}posts-preview` );
+        let controller = new AbortController();
         const results = async () => {
+            controller.abort();
+            controller = new AbortController();
             $target.html( '' ); // or loader
             if ( $input.val().trim().length < 1 ) { return }
-            const data = await fetch_data( 'query' );
+            const data = await fetch_data( 'query', controller );
             $target.html( '' );
             [ ...Object.values( data ).slice( 0, 4 ), {title: '... ... ...'} ].forEach( value => {
                 $target.append( `<label><input type="checkbox" disabled> <span>${value['date']?`(${value['date']})`:``} ${value['title']}</span></label>` );
@@ -97,7 +105,6 @@
         results();
         $input.on( 'focus', results );
         $input.on( 'input', results );
-
     })();
 
 }, 300 )}();

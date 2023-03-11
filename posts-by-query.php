@@ -771,14 +771,16 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
-// thumbnail dummy
-    // https://jeroensormani.com/how-to-include-the-wordpress-media-selector-in-your-plugin/
 // ++abort previous fetch if new one is here
-// ++ nothing found message to advisor if nothing found
+// ++check if wp codemirror has the format function inside
 // ++sanitize admin values
+    // default values to avoid double black or so
 // ++sanitize before printing
 // ++polish for publishing
     // excape everything before printing
+    // fix && prepare the texts
+// ++ nothing found message to advisor if nothing found, loading sign
+// ++ avoid 404 in api, just erturn empty on empty or not existing - let the front handle it
 // add to both websites
 // ++add a global function to print?
 // ++option to print automatically?
