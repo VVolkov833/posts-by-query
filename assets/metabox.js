@@ -7,16 +7,17 @@
     const fetch_data = async ( field_name, controller ) => {
         const query = $( `#${prefix}${field_name}` ).val().trim();
         const post_id = +$( '#post_ID' ).val(); // to exclude self
+        console.log( query + '...' );
         return await fetch(
             `/wp-json/${slug}/v1/${field_name}/` + encodeURI( query ),
             {
                 method: 'get',
                 headers: { 'X-WP-Nonce' : $( `#${prefix}rest-nonce` ).val() },
-                signal: controller.signal,
+                signal: controller?.signal || null,
             }
         )
         .then( response => response.status === 200 && response.json() || [] )
-        .then( data => data?.filter( el => el.id !== post_id ) || [] )
+        .then( data => { console.log( query + '!!!' ); console.log( (data?.filter( el => el.id !== post_id ) || []).length ); return data?.filter( el => el.id !== post_id ) || [] } )
         .catch( e => { console.log( query + ' ' + e.name ); return [] }); //++ keep only the return part
     };
 
@@ -45,7 +46,7 @@
             return [ ...document.querySelectorAll( `#${prefix}posts input:checked + span` ) ].map( a => a.textContent );
         };
 
-        FCP_Advisor( $( `#${prefix}list` ), async () => {
+        FCP_Advisor( $( `#${prefix}list` ), async controller => {
 
             const clear_html = string => {
                 const doc = document.implementation.createHTMLDocument( '' ),
@@ -54,7 +55,7 @@
                 return a.textContent;
             };
 
-            const data = await fetch_data( 'list' );
+            const data = await fetch_data( 'list', controller || null );
 
             store = Object.values( data ).map( a => {
                 a['title'] = clear_html( a['title'] ); 
@@ -63,14 +64,15 @@
             return store.map( a => a['title'] );
 
         }, { // options
-            lines: 20,
-            full: true,
+            lines: 10, // limit the print
+            full: true, // the string can contain the search phrase, not only start with it
             //start_length: 3,
-            exclude,
+            exclude, // the list of array items to exclude
+            all_correct: true, // all provided lines are correct, just range them and print even if no matches
 
         }, value => { // function on choose
             const key = Object.keys( store ).find( key => store[key]['title'] === value );
-            $( `#${prefix}list` ).val( '' );
+            $( `#${prefix}list` ).val( '' ); // ++keep the entered value
             if ( !key ) { return }
             $( `#${prefix}posts` ).append( `<label><input type="checkbox" name="${prefix}posts[]" value="${store[key]['id']}" checked> <span>${value}</span></label>` );
             reset_checkboxes_event();

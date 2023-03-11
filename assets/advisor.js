@@ -84,27 +84,31 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
             list_holder_remove();
             return;
         }
-        if ( !$holder().length ) {
-            list_holder_add();
-        }
         
         init_val = $input.val();
 
         list_holder_content();
     }
 
+    let controller = new AbortController();
     async function list_holder_content() {
-        const value = $input.val().trim().toLowerCase();
-        let content = [],
-            arr_low = [],
-            list = [];
 
+        list_holder_remove();
+
+        const value = $input.val().trim().toLowerCase();
+        let list = [];
+        console.log( '~~'+value+'...' );
         if ( typeof arr === 'function' ) {
-            list = await arr();
+            controller.abort();
+            controller = new AbortController();
+            list = await arr( controller );
+            console.log( '~~'+value+' !!!' );
         } else
         if ( Array.isArray( arr ) ) {
             list = arr;
         }
+        
+        if ( !list.length === 0 ) { return }
 
         let exclude = options?.exclude || [];
         exclude = typeof exclude === 'function' ? exclude() : exclude;
@@ -113,7 +117,9 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
             return !exclude.includes(a);
         });
 
-        arr_low = list.map( a => {
+        if ( !list.length === 0 ) { return }
+
+        let arr_low = list.map( a => {
             return a
                 .toLowerCase()
                 .replace( /&amp;|&lt;|&gt;|&quot;|&#039;|&shy;/g, function(a) {
@@ -121,27 +127,27 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
                 });
         });
 
+        let primary = [], secondary = [], tertiary = [];
         for ( let i = 0, j = arr_low.length; i < j; i++ ) {
-            if ( arr_low[i].indexOf( value ) === 0 ) { // ++?? && arr_low[i] !== value //++maybe to options
-                content.push( '<button tabindex="-1">'+list[i]+'</button>' );
+            if ( arr_low[i].indexOf( value ) === 0 ) { // the entry is the first words
+                primary.push( '<button tabindex="-1">'+list[i]+'</button>' );
+                continue;
             }
-            if ( content.length > ( options?.lines || 4 ) ) {
-                break;
+            if ( arr_low[i].indexOf( value ) > 0 && options?.full ) { // the entry is in the line
+                secondary.push( '<button tabindex="-1">'+list[i]+'</button>' );
+                continue;
             }
+
+            if ( !options?.all_correct ) { break; } // all entries fit by default
+            tertiary.push( '<button tabindex="-1">'+list[i]+'</button>' );
         }
-        if ( options?.full ) {
-            for ( let i = 0, j = arr_low.length; i < j; i++ ) {
-                if ( arr_low[i].indexOf( value ) > 0 ) {
-                    content.push( '<button tabindex="-1">'+list[i]+'</button>' );
-                }
-                if ( content.length > ( options?.lines || 4 ) ) {
-                    break;
-                }
-            }
-        }
+
+        let content = [ ...primary, ...secondary, ...tertiary ].slice( 0, ( options?.lines || 5 ) );
         
-        if ( !content.length ) {
-            list_holder_remove();
+        if ( !content.length ) { return }
+
+        if ( !$holder().length ) {
+            list_holder_add();
         }
 
         $holder().empty().append( content.join( '' ) );
@@ -186,3 +192,4 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
     }
 
 }
+// ++ add cache to search by already entered phrase

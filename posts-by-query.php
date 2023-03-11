@@ -162,6 +162,8 @@ add_action( 'rest_api_init', function () {
             break;
         }
 
+        if ( FCPPBK_DEV ) { usleep( rand(0, 1000000) ); } // simulate server responce delay
+
         return [
             'methods'  => 'GET',
             'callback' => function( \WP_REST_Request $request ) use ( $wp_query_args, $format_output ) {
@@ -187,9 +189,9 @@ add_action( 'rest_api_init', function () {
                 return $result;
             },
             'permission_callback' => function() {
-                if ( empty( $_SERVER['HTTP_REFERER'] ) ) { return false; }
-                if ( strtolower( parse_url( $_SERVER['HTTP_REFERER'], PHP_URL_HOST ) ) !== strtolower( $_SERVER['HTTP_HOST'] ) ) { return false; }
-                if ( !current_user_can( 'administrator' ) ) { return false; } // works only with X-WP-Nonce header passed
+                //if ( empty( $_SERVER['HTTP_REFERER'] ) ) { return false; }
+                //if ( strtolower( parse_url( $_SERVER['HTTP_REFERER'], PHP_URL_HOST ) ) !== strtolower( $_SERVER['HTTP_HOST'] ) ) { return false; }
+                //if ( !current_user_can( 'administrator' ) ) { return false; } // works only with X-WP-Nonce header passed
                 return true;
             },
             'args' => [
@@ -771,6 +773,7 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
+// ++ advisor - show full list option as the content, not the title, might contain the correct value
 // ++abort previous fetch if new one is here
 // ++check if wp codemirror has the format function inside
 // ++sanitize admin values
