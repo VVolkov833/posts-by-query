@@ -62,23 +62,11 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
 
     function loading_status_add( status ) {
         loading_status_remove();
-        const width = $input.outerWidth(),
-            height = $input.outerHeight(),
-            position = $input.position();
-
-        $input.after( $( '<div>', {
-            'class': css_status_class,
-            'style': 'left:' + ( position.left + width - height ) + 'px;'
-                     + 'top:' + position.top + 'px;'
-                     + 'width:' + height + 'px;'
-                     + 'height:' + height + 'px;'
-        }));
-
         if ( !status ) { return; }
-        $input.nextAll( '.' + css_status_class )[0].classList.add( 'fcp-advisor-'+status );
+        $input[0].classList.add( css_prefix+'status-'+status );
     }
     function loading_status_remove() {
-        $input.nextAll( '.' + css_status_class ).remove();
+        $input[0].classList.remove( ...(() => { return [ ...$input[0].classList ].filter( a => a.includes('-status-') ) })() );
     }
 
     function list_holder_add() {
