@@ -773,7 +773,7 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
-// loading
+// ++loading for the left field too
 // ++check if wp codemirror has the format function inside
 // ++sanitize admin values
     // default values to avoid double black or so

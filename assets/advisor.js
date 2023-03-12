@@ -215,3 +215,5 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
 
 }
 // ++ add cache to search by already entered phrase
+// ++ abort all if the field got cleared
+// ++? appear the loading after 0.3s

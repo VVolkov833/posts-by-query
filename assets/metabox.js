@@ -89,15 +89,32 @@
     
     // --------------- the query field
     (() => {
+        const loading_status_remove = () => { // ++ uptimize for here and advisor as messy, including the controller
+            $input[0].classList.remove( ...(() => { return [ ...$input[0].classList ].filter( a => a.includes('-status-') ) })() );
+        }
+        const loading_status_add = status => {
+            loading_status_remove();
+            if ( !status ) { return; }
+            $input[0].classList.add( 'fcp-advisor-status-'+status );
+        };
         const $input = $( `#${prefix}query` );
         const $target = $( `#${prefix}posts-preview` );
         let controller = new AbortController();
         const results = async () => {
+            if ( $input.val().trim().length < 1 ) { return }
+            let aborted = false;
+            let fail = setTimeout(()=>{});
+            loading_status_add( 'loading' );
             controller.abort();
             controller = new AbortController();
+            controller.signal.onabort = () => aborted = true;
             $target.html( '' ); // or loader
-            if ( $input.val().trim().length < 1 ) { return }
             const data = await fetch_data( 'query', controller );
+            fail = aborted && setTimeout(()=>{}) || setTimeout( () => loading_status_add( 'failed' ) );
+            if ( data.length !== 0 ) {
+                clearTimeout( fail );
+                loading_status_add( 'success' );
+            }
             $target.html( '' );
             [ ...Object.values( data ).slice( 0, 4 ), {title: '... ... ...'} ].forEach( value => {
                 $target.append( `<label><input type="checkbox" disabled> <span>${value['date']?`(${value['date']})`:``} ${value['title']}</span></label>` );
@@ -106,6 +123,8 @@
         results();
         $input.on( 'focus', results );
         $input.on( 'input', results );
+        $input.on( 'blur', loading_status_remove );
     })();
 
 }, 300 )}();
+// ++ no articles message as input??
