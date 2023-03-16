@@ -2,7 +2,7 @@
 /*
 Plugin Name: FCP Posts by Search Query
 Description: Searches and prints the posts tiles by query
-Version: 0.0.5
+Version: 1.0.0
 Requires at least: 5.8
 Tested up to: 6.1
 Requires PHP: 7.4
@@ -67,9 +67,8 @@ function styling_options() {
     ];
 }
 
-// fill in the initial settings
-register_activation_hook( __FILE__, function() {
-    add_option( FCPPBK_PREF.'settings', [
+function default_values() {
+    return [
         'main-color' => '#007cba',
         'secondary-color' => '#abb8c3',
         'layout' => '3-columns',
@@ -77,8 +76,12 @@ register_activation_hook( __FILE__, function() {
         'excerpt-length' => '200',
         'select-from' => [ 'post' ],
         'apply-to' => [ 'page', 'post' ],
-    ]);
+    ];
+}
 
+// fill in the initial settings
+register_activation_hook( __FILE__, function() {
+    add_option( FCPPBK_PREF.'settings', default_values() );
 });
 
 // admin interface
@@ -349,8 +352,6 @@ add_action( 'save_post', function( $postID ) {
 
 function sanitize_meta( $value, $field, $postID ) {
 
-    return $value;
-
     $field = ( strpos( $field, FCPPBK_PREF ) === 0 ) ? substr( $field, strlen( FCPPBK_PREF ) ) : $field;
 
     switch ( $field ) {
@@ -361,7 +362,8 @@ function sanitize_meta( $value, $field, $postID ) {
             return sanitize_text_field( $value );
         break;
         case ( 'posts' ):
-            return array_values( array_filter( $value, 'is_numeric' ) ); // post-type & is-published filters are performed before printing on the front-end
+            return array_values( array_filter( $value, 'is_numeric' ) );
+            // post-type & is-published filters are performed before printing on the front-end to not ruin on save if something changed in settings
         break;
     }
 
@@ -773,9 +775,10 @@ function sanitize_settings( $options ){
 	return $options;
 }
 
-// ++check if wp codemirror has the format function inside
 // ++sanitize admin values
     // default values to avoid double black or so
+    // turn the fields to the arrays structure
+    // data-default for (x)
 // ++sanitize before printing
 // ++polish for publishing
     // excape everything before printing
