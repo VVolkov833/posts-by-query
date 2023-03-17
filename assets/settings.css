@@ -56,3 +56,7 @@ form h2::after {
     cursor: pointer;
     transform: rotate(45deg);
 }
+
+.wp-picker-container .wp-picker-clear {
+    xdisplay: none;
+}

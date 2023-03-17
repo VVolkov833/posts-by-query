@@ -21,6 +21,7 @@ define( 'FCPPBK_PREF', FCPPBK_SLUG.'-' );
 
 define( 'FCPPBK_DEV', true );
 define( 'FCPPBK_VER', get_file_data( __FILE__, [ 'ver' => 'Version' ] )[ 'ver' ] . ( FCPPBK_DEV ? time() : '' ) );
+define( 'FCPPBK_SET', FCPPBK_PREF.'settings' );
 
 function layout_options($list_length = 0) {
     $list_length = is_numeric( $list_length ) ? $list_length : 10;
@@ -81,7 +82,7 @@ function default_values() {
 
 // fill in the initial settings
 register_activation_hook( __FILE__, function() {
-    add_option( FCPPBK_PREF.'settings', default_values() );
+    add_option( FCPPBK_SET, default_values() );
 });
 
 // admin interface
@@ -320,7 +321,7 @@ function public_post_types() {
 function get_settings() {
     static $settings = [];
     if ( !empty( $settings ) ) { return $settings; }
-    $settings = get_option( FCPPBK_PREF.'settings' );
+    $settings = get_option( FCPPBK_SET );
     return $settings;
 }
 
@@ -545,15 +546,16 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
 add_action( 'admin_menu', function() {
     // capabilities filter is inside
 	add_options_page( 'Posts by Queryuery settings', 'Posts by Queryuery', 'switch_themes', 'posts-by-query', function() {
+        $settings = settings_settings();
         ?>
         <div class="wrap">
             <h2><?php echo get_admin_page_title() ?></h2>
     
             <form action="options.php" method="POST">
                 <?php
-                    do_settings_sections( FCPPBK_PREF.'settings-page' ); // print fields of the page / tab
+                    do_settings_sections( $settings->page ); // print fields of the page / tab
                     submit_button();
-                    settings_fields( FCPPBK_PREF.'settings-group1' ); // nonce
+                    settings_fields( $settings->group ); // nonce
                 ?>
             </form>
         </div>
@@ -561,7 +563,62 @@ add_action( 'admin_menu', function() {
     });
 });
 
+// print the settings page
 add_action( 'admin_init', function() {
+
+    $settings = settings_settings();
+    $fields_structure = settings_structure();
+
+    $add_field = function( $title, $type = '', $atts = [] ) use ( $settings ) {
+
+        $types = [ 'text', 'color', 'number', 'textarea', 'radio', 'checkbox', 'checkboxes', 'select', 'comment', 'image' ];
+        $type = ( empty( $type ) || !in_array( $type, $types ) ) ? $types[0] : $type;
+        $function = __NAMESPACE__.'\\'.$type;
+        if ( !function_exists( $function ) ) { return; }
+        $slug = $atts['slug'] ?? sanitize_title( $title );
+
+        $attributes = (object) [
+            'name' => $settings->varname.'['.$slug.']',
+            'id' => $settings->varname . '--' . $slug,
+            'value' => $slug ? ( $settings->values[ $slug ] ?? '' ) : '',
+            'placeholder' => $atts['placeholder'] ?? '',
+            'className' => $atts['className'] ?? '',
+            'options' => $atts['options'] ?? [],
+            'option' => $atts['option'] ?? '',
+            'label' => $atts['label'] ?? '',
+            'comment' => $atts['comment'] ?? '',
+            'rows' => $atts['rows'] ?? 10,
+            'cols' => $atts['cols'] ?? 50,
+        ];
+
+        add_settings_field(
+            $slug,
+            $title,
+            function() use ( $attributes, $function ) { call_user_func( $function, $attributes ); },
+            $settings->page,
+            $settings->section
+        );
+    };
+
+    $add_section = function( $section, $title, $slug = '' ) use ( &$settings, $add_field ) {
+
+        $settings->section = $slug ?? sanitize_title( $title );
+        add_settings_section( $settings->section, $title, '', $settings->page );
+
+        foreach ( $section as $v ) {
+            $add_field( $v[0], $v[1], $v[2] );
+        }
+    };
+
+    // add full structure
+    foreach ( $fields_structure as $k => $v ) {
+        $add_section( $v, $k );
+    }
+
+    register_setting( $settings->group, $settings->varname, __NAMESPACE__.'\settings_sanitize' ); // register, save, nonce
+});
+
+function settings_structure() {
 
     $fields_structure = [
         'Description' => [
@@ -572,11 +629,11 @@ add_action( 'admin_init', function() {
             ['Secondary color', 'color'],
             ['Layout', 'select', [ 'options' => '%layout_options' ]],
             ['Style', 'select', [ 'options' => '%styling_options' ]],
-            ['Additional CSS', 'textarea'],
-            ['Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ]],
+            ['Additional CSS', 'textarea', [ 'filter' => 'css' ]],
+            ['Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it', 'filter' => 'integer' ]],
             ['Default thumbnail', 'image', [ 'comment' => 'This image is shown, if a post doesn\'t have the featured image', 'className' => 'image' ]],
             ['Thumbnail size', 'select', [ 'options' => '%thumbnail_sizes' ]],
-            ['Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols' ]],
+            ['Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols', 'filter' => 'integer' ]],
             ['"Read more" text', 'text', [ 'placeholder' => __( 'Read more' ) ]],
         ],
         'Hide details' => [
@@ -592,13 +649,6 @@ add_action( 'admin_init', function() {
             ['Apply to', 'checkboxes', [ 'options' => '%public_post_types', 'comment' => 'This will add the option to query the posts to selected post types editor bottom' ]],
         ],
     ];
-
-    $settings = (object) [
-        'page' => FCPPBK_PREF.'settings-page',
-        'varname' => FCPPBK_PREF.'settings',
-    ];
-    $settings->values = get_option( $settings->varname );
-    // $settings->section goes later
 
     // dynamic options to add to the structure
     $options = [];
@@ -616,56 +666,83 @@ add_action( 'admin_init', function() {
 
     $options['public_post_types'] = public_post_types();
 
-    // printing functions
-    $add_settings_field = function( $title, $type = '', $atts = [] ) use ( $settings, $options ) {
-
-        $types = [ 'text', 'color', 'number', 'textarea', 'radio', 'checkbox', 'checkboxes', 'select', 'comment', 'image' ];
-        $type = ( empty( $type ) || !in_array( $type, $types ) ) ? $types[0] : $type;
-        $function = __NAMESPACE__.'\\'.$type;
-        if ( !function_exists( $function ) ) { return; }
-        $slug = $atts['slug'] ?? sanitize_title( $title );
-
-        $attributes = (object) [
-            'name' => $settings->varname.'['.$slug.']',
-            'id' => $settings->varname . '--' . $slug,
-            'value' => $slug ? ( $settings->values[ $slug ] ?? '' ) : '',
-            'placeholder' => $atts['placeholder'] ?? '',
-            'className' => $atts['className'] ?? '',
-            'options' => $options[ substr( $atts['options'], 1 ) ] ?? [],
-            'option' => $atts['option'] ?? '',
-            'label' => $atts['label'] ?? '',
-            'comment' => $atts['comment'] ?? '',
-            'rows' => $atts['rows'] ?? 10,
-            'cols' => $atts['cols'] ?? 50,
-        ];
-
-        add_settings_field(
-            $slug,
-            $title,
-            function() use ( $attributes, $function ) { call_user_func( $function, $attributes ); },
-            $settings->page,
-            $settings->section
-        );
-    };
-
-    $add_settings_section = function( $section, $title, $slug = '' ) use ( &$settings, $add_settings_field ) {
-
-        $settings->section = $slug ?? sanitize_title( $title );
-        add_settings_section( $settings->section, $title, '', $settings->page );
-
-        foreach ( $section as $v ) {
-            $add_settings_field( $v[0], $v[1], $v[2] );
+    foreach( $fields_structure as &$v ) {
+        foreach ( $v as &$w ) {
+            if ( !$w[2] || !$w[2]['options'] || !is_string( $w[2]['options'] ) || strpos( $w[2]['options'], '%' ) !== 0 ) { continue; }
+            $w[2]['options'] = $options[ substr( $w[2]['options'], 1 ) ] ?? [];
         }
-    };
-
-    // add full structure
-    foreach ( $fields_structure as $k => $v ) {
-        $add_settings_section( $v, $k );
     }
 
-    register_setting( FCPPBK_PREF.'settings-group1', $settings->varname, __NAMESPACE__.'\sanitize_settings' ); // register, save, nonce
-});
+    return $fields_structure;
+}
 
+function settings_settings() {
+    return (object) [
+        'varname' => FCPPBK_SET,
+        'group' => FCPPBK_SET.'-group',
+        'page' => FCPPBK_SET.'-page',
+        'section' => '',
+        'values' => get_option( FCPPBK_SET ),
+    ];
+}
+
+function settings_sanitize( $values ){
+
+    //print_r( $values ); exit;
+    $fields_structure = settings_structure();
+    $default_values = default_values();
+    
+    $filters = [
+        'integer' => function($v) {
+            return trim( $v ) === '' ? '' : intval( $v );
+        },
+        'css' => function($v) { //++ //maybe mark as it is printed 
+            return $v;
+        }
+    ];
+
+    $trials = [];
+    foreach ( $fields_structure as $v ) {
+        foreach ( $v as $w ) {
+            $atts = $w[2] ?? [];
+            $slug = $atts['slug'] ?? sanitize_title( $w[0] );
+            $trials[ $slug ] = (object) array_filter( [
+                'type' => $w[1] ?? 'text',
+                'options' => $atts['options'] ?? null,
+                'option' => $atts['option'] ?? null,
+                'filter' => $atts['filter'] ?? null,
+                'default' => $default_values[ $slug ] ?? null,
+                // ++add condition if gotta be default and not empty
+            ]);
+        }
+    }
+    //print_r( [$values, $trials] ); exit;
+	foreach( $values as $k => &$v ){
+        $trial = $trials[ $k ];
+
+        if ( $trial->filter ) {
+            $v = $filters[ $trial->filter ] ? $filters[ $trial->filter ]( $v ) : $v;
+        }
+        if ( $trial->options ) {
+            if ( is_array( $v ) ) {
+                $v = array_intersect( $v, array_keys( $trial->options ) );
+            } else {
+                $v = in_array( $v, array_keys( $trial->options ) ) ? $v : '';
+            }
+        }
+        if ( $trial->option ) {
+            $v = $v === $trial->option ? $v : '';
+        }
+        if ( in_array( $trial->type, ['text', 'textarea'] ) ) {
+            $v = sanitize_text_field( $v );
+        }
+
+	}
+
+	return $values;
+}
+
+// fields
 function text($a, $type = '') {
     ?>
     <input type="<?php echo in_array( $type, ['color', 'number'] ) ? $type : 'text' ?>"
@@ -751,6 +828,7 @@ function checkbox($a) {
     <?php echo isset( $a->comment ) ? '<p><em>'.esc_html( $a->comment ).'</em></p>' : '' ?>
     <?php
 }
+
 function radio($a) { // make like others or add the exception
     static $checked_once = false;
     $checked_once = $checked_once ?: $a->checked === $a->value;
@@ -781,29 +859,15 @@ function image($a) {
     <?php
 }
 
-function sanitize_settings( $options ){
-
-	foreach( $options as $name => & $val ){
-		if( $name == 'input' )
-			$val = strip_tags( $val );
-
-		if( $name == 'checkbox' )
-			$val = intval( $val );
-	}
-
-	return $options;
-}
-
 // ++sanitize admin values
-    // default values to avoid double black or so
-    // turn the fields to the arrays structure
-        // with defaults and filters
-    // data-default for (x)
-// ++sanitize before printing
+    //test all
+    //test css the hardest
+// ++sanitize before printing, test css, maybe
 // change the class names in settings.js
 // ++polish for publishing
     // excape everything before printing
     // fix && prepare the texts
+// eliminate all warnings
 // add to both websites
 // ++add a global function to print?
 // ++option to print automatically?
