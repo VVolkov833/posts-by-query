@@ -617,7 +617,7 @@ add_action( 'admin_init', function() {
     $options['public_post_types'] = public_post_types();
 
     // printing functions
-    $add_settings_field = function( $title, $type = '', $atts = [] ) use ( $settings ) {
+    $add_settings_field = function( $title, $type = '', $atts = [] ) use ( $settings, $options ) {
 
         $types = [ 'text', 'color', 'number', 'textarea', 'radio', 'checkbox', 'checkboxes', 'select', 'comment', 'image' ];
         $type = ( empty( $type ) || !in_array( $type, $types ) ) ? $types[0] : $type;
@@ -631,7 +631,7 @@ add_action( 'admin_init', function() {
             'value' => $slug ? ( $settings->values[ $slug ] ?? '' ) : '',
             'placeholder' => $atts['placeholder'] ?? '',
             'className' => $atts['className'] ?? '',
-            'options' => $atts['options'] ?? '',
+            'options' => $options[ substr( $atts['options'], 1 ) ] ?? [],
             'option' => $atts['option'] ?? '',
             'label' => $atts['label'] ?? '',
             'comment' => $atts['comment'] ?? '',
@@ -648,43 +648,20 @@ add_action( 'admin_init', function() {
         );
     };
 
-    $add_settings_section = function( $section, $name ) use ( &$settings ) {
-        $settings->section = 'description';
-        add_settings_section( $settings->section, 'Description', '', $settings->page );
-            $add_settings_field( '', 'comment', [ 'comment' => '<p>Add the posts section with the following shortcode <code>['.FCPPBK_SLUG.']</code></p>' ] );
+    $add_settings_section = function( $section, $title, $slug = '' ) use ( &$settings, $add_settings_field ) {
+
+        $settings->section = $slug ?? sanitize_title( $title );
+        add_settings_section( $settings->section, $title, '', $settings->page );
+
+        foreach ( $section as $v ) {
+            $add_settings_field( $v[0], $v[1], $v[2] );
+        }
     };
 
-    // structure of fields
-    $settings->section = 'description';
-	add_settings_section( $settings->section, 'Description', '', $settings->page );
-        $add_settings_field( '', 'comment', [ 'comment' => '<p>Add the posts section with the following shortcode <code>['.FCPPBK_SLUG.']</code></p>' ] );
-    $settings->section = 'styling-settings';
-	add_settings_section( $settings->section, 'Styling settings', '', $settings->page );
-        $add_settings_field( 'Main color', 'color' );
-        $add_settings_field( 'Secondary color', 'color' );
-        $add_settings_field( 'Layout', 'select', [ 'options' => $options['layout_options'] ] );
-        $add_settings_field( 'Style', 'select', [ 'options' => $options['styling_options'] ] );
-        $add_settings_field( 'Additional CSS', 'textarea' );
-        $add_settings_field( 'Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ] ); // ++ make the comment work
-        $add_settings_field( 'Default thumbnail', 'image', [ 'comment' => 'This image is shown, if a post doesn\'t have the featured image', 'className' => 'image' ] );
-        $add_settings_field( 'Thumbnail size', 'select', [ 'options' => $options['thumbnail_sizes'] ] );
-        $add_settings_field( 'Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols' ] );
-        $add_settings_field( '"Read more" text', 'text', [ 'placeholder' => __( 'Read more' ) ] );
-
-    $settings->section = 'hide-details';
-    add_settings_section( $settings->section, 'Hide details', '', $settings->page );
-        $add_settings_field( '', 'checkbox', [ 'option' => '1', 'label' => 'Hide the date', 'slug' => 'hide-date' ] );
-        $add_settings_field( '', 'checkbox', [ 'option' => '1', 'label' => 'Hide the excerpt', 'slug' => 'hide-excerpt' ] );
-        $add_settings_field( '', 'checkbox', [ 'option' => '1', 'label' => 'Hide the category', 'slug' => 'hide-category' ] );
-        $add_settings_field( '', 'checkbox', [ 'option' => '1', 'label' => 'Hide the "'.__('Read more').'" button', 'slug' => 'hide-read-more' ] );
-
-    $settings->section = 'other-settings';
-    add_settings_section( $settings->section, 'Other settings', '', $settings->page );
-        $add_settings_field( 'Headline', 'text' );
-        $add_settings_field( 'CSS Class', 'text' );
-        $add_settings_field( 'Select from', 'checkboxes', [ 'options' => $options['public_post_types'] ] );
-        $add_settings_field( 'Apply to', 'checkboxes', [ 'options' => $options['public_post_types'], 'comment' => 'This will add the option to query the posts to selected post types editor bottom' ] );
-        //$add_settings_field( 'Defer style', 'checkbox', [ 'option' => '1', 'label' => 'defer the render blocking style.css', 'comment' => 'If you use a caching plugin, most probably it fulfulls the role of this checkbox' ] );
+    // add full structure
+    foreach ( $fields_structure as $k => $v ) {
+        $add_settings_section( $v, $k );
+    }
 
     register_setting( FCPPBK_PREF.'settings-group1', $settings->varname, __NAMESPACE__.'\sanitize_settings' ); // register, save, nonce
 });
@@ -823,6 +800,7 @@ function sanitize_settings( $options ){
         // with defaults and filters
     // data-default for (x)
 // ++sanitize before printing
+// change the class names in settings.js
 // ++polish for publishing
     // excape everything before printing
     // fix && prepare the texts
