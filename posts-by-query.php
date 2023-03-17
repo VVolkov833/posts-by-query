@@ -101,7 +101,7 @@ add_action( 'add_meta_boxes', function() {
 add_action( 'admin_enqueue_scripts', function() {
 
     if ( !current_user_can( 'administrator' ) ) { return; }
-    $files = [ 'post' => [ 'metabox', 'advisor' ], 'settings_page_posts-by-query' => [ 'settings', 'codemirror', 'media' ] ];
+    $files = [ 'post' => [ 'metabox', 'advisor' ], 'settings_page_posts-by-query' => [ 'settings', 'color', 'media', 'codemirror' ] ];
     $screen = get_current_screen();
     if ( !isset( $screen ) || !is_object( $screen ) || !isset( $files[ $screen->base ] ) ) { return; }
 
@@ -121,6 +121,10 @@ add_action( 'admin_enqueue_scripts', function() {
         if ( $ext === 'css' ) { wp_enqueue_style( $handle, $url, [], FCPPBK_VER, 'all' ); }
         if ( $ext === 'js' ) { wp_enqueue_script( $handle, $url, [], FCPPBK_VER, false ); }
     }
+
+    // color picker
+    wp_enqueue_script( 'wp-color-picker' );
+    wp_enqueue_style( 'wp-color-picker' );
 
     // the css editor
     wp_localize_script( 'jquery', 'cm_settings', [ 'codeEditor' => wp_enqueue_code_editor( ['type' => 'text/css'] ) ] );
@@ -618,7 +622,7 @@ add_action( 'admin_init', function() {
 
     $settings->section = 'styling-settings';
 	add_settings_section( $settings->section, 'Styling settings', '', $settings->page );
-        $add_settings_field( 'Main color', 'color' ); // ++use wp default picker
+        $add_settings_field( 'Main color', 'color' );
         $add_settings_field( 'Secondary color', 'color' );
         $add_settings_field( 'Layout', 'select', [ 'options' => $layout_options ] );
         $add_settings_field( 'Style', 'select', [ 'options' => $styling_options ] );
@@ -778,6 +782,7 @@ function sanitize_settings( $options ){
 // ++sanitize admin values
     // default values to avoid double black or so
     // turn the fields to the arrays structure
+        // with defaults and filters
     // data-default for (x)
 // ++sanitize before printing
 // ++polish for publishing

@@ -1,6 +1,6 @@
 jQuery( document ).ready( $ => {
 
-    $( 'input[type=text], input[type=color], input[type=number], button.image' ).each( (a,b) => {
+    $( 'input[type=text], input[type=number], button.image' ).each( (a,b) => {
 
         const clear = e => {
             $self = $( e.target );
@@ -10,4 +10,5 @@ jQuery( document ).ready( $ => {
         $( b ).after( `<input type="button" value="+" class="clear" />` ).next().on( 'click', clear );
 
     });
+
 });
