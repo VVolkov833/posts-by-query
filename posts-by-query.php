@@ -563,7 +563,35 @@ add_action( 'admin_menu', function() {
 
 add_action( 'admin_init', function() {
 
-    // ++filter for admin & screen
+    $fields_structure = [
+        'Description' => [
+            ['', 'comment', [ 'comment' => '<p>Add the posts section with the following shortcode <code>['.FCPPBK_SLUG.']</code></p>' ]],
+        ],
+        'Styling settings' => [
+            ['Main color', 'color'],
+            ['Secondary color', 'color'],
+            ['Layout', 'select', [ 'options' => '%layout_options' ]],
+            ['Style', 'select', [ 'options' => '%styling_options' ]],
+            ['Additional CSS', 'textarea'],
+            ['Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ]],
+            ['Default thumbnail', 'image', [ 'comment' => 'This image is shown, if a post doesn\'t have the featured image', 'className' => 'image' ]],
+            ['Thumbnail size', 'select', [ 'options' => '%thumbnail_sizes' ]],
+            ['Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols' ]],
+            ['"Read more" text', 'text', [ 'placeholder' => __( 'Read more' ) ]],
+        ],
+        'Hide details' => [
+            ['', 'checkbox', [ 'option' => '1', 'label' => 'Hide the date', 'slug' => 'hide-date' ]],
+            ['', 'checkbox', [ 'option' => '1', 'label' => 'Hide the excerpt', 'slug' => 'hide-excerpt' ]],
+            ['', 'checkbox', [ 'option' => '1', 'label' => 'Hide the category', 'slug' => 'hide-category' ]],
+            ['', 'checkbox', [ 'option' => '1', 'label' => 'Hide the "'.__('Read more').'" button', 'slug' => 'hide-read-more' ]],
+        ],
+        'Other settings' => [
+            ['Headline', 'text'],
+            ['CSS Class', 'text'],
+            ['Select from', 'checkboxes', [ 'options' => '%public_post_types' ]],
+            ['Apply to', 'checkboxes', [ 'options' => '%public_post_types', 'comment' => 'This will add the option to query the posts to selected post types editor bottom' ]],
+        ],
+    ];
 
     $settings = (object) [
         'page' => FCPPBK_PREF.'settings-page',
@@ -572,7 +600,24 @@ add_action( 'admin_init', function() {
     $settings->values = get_option( $settings->varname );
     // $settings->section goes later
 
-    $add_settings_field = function( $title, $type = '', $atts = [] ) use ( $settings ) { // $atts: placeholder, options, option, step
+    // dynamic options to add to the structure
+    $options = [];
+    $options['layout_options'] = array_map( function( $a ) {
+        return $a['t'];
+    }, layout_options() );
+
+    $options['styling_options'] = styling_options();
+
+    $thumbnail_sizes = wp_get_registered_image_subsizes();
+    $options['thumbnail_sizes'] = [ '' => 'No image', 'full' => 'Full' ] + array_reduce( array_keys( $thumbnail_sizes ), function( $result, $item ) use ( $thumbnail_sizes ) {
+        $result[ $item ] = ucfirst( $item ) . ' ('.$thumbnail_sizes[$item]['width'].'x'.$thumbnail_sizes[$item]['height'].')';
+        return $result;
+    }, [] );
+
+    $options['public_post_types'] = public_post_types();
+
+    // printing functions
+    $add_settings_field = function( $title, $type = '', $atts = [] ) use ( $settings ) {
 
         $types = [ 'text', 'color', 'number', 'textarea', 'radio', 'checkbox', 'checkboxes', 'select', 'comment', 'image' ];
         $type = ( empty( $type ) || !in_array( $type, $types ) ) ? $types[0] : $type;
@@ -603,33 +648,26 @@ add_action( 'admin_init', function() {
         );
     };
 
-    $layout_options = array_map( function( $a ) {
-        return $a['t'];
-    }, layout_options() );
-
-    $styling_options = styling_options();
-
-    $thumbnail_sizes = wp_get_registered_image_subsizes(); //++full, ++no image
-    $thumbnail_sizes = [ '' => 'No image', 'full' => 'Full' ] + array_reduce( array_keys( $thumbnail_sizes ), function( $result, $item ) use ( $thumbnail_sizes ) {
-        $result[ $item ] = ucfirst( $item ) . ' ('.$thumbnail_sizes[$item]['width'].'x'.$thumbnail_sizes[$item]['height'].')';
-        return $result;
-    }, [] );
+    $add_settings_section = function( $section, $name ) use ( &$settings ) {
+        $settings->section = 'description';
+        add_settings_section( $settings->section, 'Description', '', $settings->page );
+            $add_settings_field( '', 'comment', [ 'comment' => '<p>Add the posts section with the following shortcode <code>['.FCPPBK_SLUG.']</code></p>' ] );
+    };
 
     // structure of fields
     $settings->section = 'description';
 	add_settings_section( $settings->section, 'Description', '', $settings->page );
         $add_settings_field( '', 'comment', [ 'comment' => '<p>Add the posts section with the following shortcode <code>['.FCPPBK_SLUG.']</code></p>' ] );
-
     $settings->section = 'styling-settings';
 	add_settings_section( $settings->section, 'Styling settings', '', $settings->page );
         $add_settings_field( 'Main color', 'color' );
         $add_settings_field( 'Secondary color', 'color' );
-        $add_settings_field( 'Layout', 'select', [ 'options' => $layout_options ] );
-        $add_settings_field( 'Style', 'select', [ 'options' => $styling_options ] );
+        $add_settings_field( 'Layout', 'select', [ 'options' => $options['layout_options'] ] );
+        $add_settings_field( 'Style', 'select', [ 'options' => $options['styling_options'] ] );
         $add_settings_field( 'Additional CSS', 'textarea' );
         $add_settings_field( 'Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it' ] ); // ++ make the comment work
         $add_settings_field( 'Default thumbnail', 'image', [ 'comment' => 'This image is shown, if a post doesn\'t have the featured image', 'className' => 'image' ] );
-        $add_settings_field( 'Thumbnail size', 'select', [ 'options' => $thumbnail_sizes ] );
+        $add_settings_field( 'Thumbnail size', 'select', [ 'options' => $options['thumbnail_sizes'] ] );
         $add_settings_field( 'Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols' ] );
         $add_settings_field( '"Read more" text', 'text', [ 'placeholder' => __( 'Read more' ) ] );
 
@@ -644,8 +682,8 @@ add_action( 'admin_init', function() {
     add_settings_section( $settings->section, 'Other settings', '', $settings->page );
         $add_settings_field( 'Headline', 'text' );
         $add_settings_field( 'CSS Class', 'text' );
-        $add_settings_field( 'Select from', 'checkboxes', [ 'options' => public_post_types() ] );
-        $add_settings_field( 'Apply to', 'checkboxes', [ 'options' => public_post_types(), 'comment' => 'This will add the option to query the posts to selected post types editor bottom' ] );
+        $add_settings_field( 'Select from', 'checkboxes', [ 'options' => $options['public_post_types'] ] );
+        $add_settings_field( 'Apply to', 'checkboxes', [ 'options' => $options['public_post_types'], 'comment' => 'This will add the option to query the posts to selected post types editor bottom' ] );
         //$add_settings_field( 'Defer style', 'checkbox', [ 'option' => '1', 'label' => 'defer the render blocking style.css', 'comment' => 'If you use a caching plugin, most probably it fulfulls the role of this checkbox' ] );
 
     register_setting( FCPPBK_PREF.'settings-group1', $settings->varname, __NAMESPACE__.'\sanitize_settings' ); // register, save, nonce
