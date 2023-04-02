@@ -6,7 +6,7 @@ Version: 1.0.0
 Requires at least: 5.8
 Tested up to: 6.1
 Requires PHP: 7.4
-Author: Firmcatalyst, Vadim Volkov
+Author: Firmcatalyst, Vadim Volkov, Aude Jamier
 Author URI: https://firmcatalyst.com
 License: GPL v3 or later
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -361,7 +361,7 @@ function sanitize_meta( $value, $field, $postID ) {
 
     switch ( $field ) {
         case ( 'variants' ):
-            return in_array( $value, ['query', 'list'] ) ? $value : 'query';
+            return in_array( $value, ['query', 'list'] ) ? $value : 'query'; // ++ make the list in one place and select default as [0]
         break;
         case ( 'query' ):
             return sanitize_text_field( $value );
@@ -545,7 +545,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
 // settings page
 add_action( 'admin_menu', function() {
     // capabilities filter is inside
-	add_options_page( 'Posts by Queryuery settings', 'Posts by Queryuery', 'switch_themes', 'posts-by-query', function() {
+	add_options_page( 'Posts by Query settings', 'Posts by Query', 'switch_themes', 'posts-by-query', function() {
         $settings = settings_settings();
         ?>
         <div class="wrap">
@@ -694,10 +694,28 @@ function settings_sanitize( $values ){
     
     $filters = [
         'integer' => function($v) {
-            return trim( $v ) === '' ? '' : intval( $v );
+            return trim( $v ) === '' ? '' : ( intval( $v ) ?: '' ); // 0 not allowed
         },
-        'css' => function($v) { //++ //maybe mark as it is printed 
-            return $v;
+        'css' => function($v) {
+            $css = $v;
+
+            // try to escape tags inside svg with url-encoding
+            if ( strpos( $css, '<' ) !== false && preg_match( '/<\/?\w+/', $css ) ) {
+                // the idea is taken from https://github.com/yoksel/url-encoder/
+                $svg_sanitized = preg_replace_callback( '/url\(\s*(["\']*)\s*data:\s*image\/svg\+xml(.*)\\1\s*\)/', function($m) {
+                    return 'url('.$m[1].'data:image/svg+xml'
+                        .preg_replace_callback( '/[\r\n%#\(\)<>\?\[\]\\\\^\`\{\}\|]+/', function($m) {
+                            return urlencode( $m[0] );
+                        }, urldecode( $m[2] ) )
+                        .$m[1].')';
+                }, $css );
+
+                if ( $svg_sanitized !== null ) {
+                    $css = $svg_sanitized;
+                }
+            }
+
+            return $css; // sanitize_text_field is applied to textareas by field type
         }
     ];
 
@@ -738,6 +756,7 @@ function settings_sanitize( $values ){
         }
 
 	}
+    //print_r( [$values, $trials] ); exit;
 
 	return $values;
 }
@@ -859,20 +878,17 @@ function image($a) {
     <?php
 }
 
-// ++sanitize admin values
-    //test all
-    //test css the hardest
-// ++sanitize before printing, test css, maybe
+// ++more styles
+    // giessler
+    // preview?
 // change the class names in settings.js
 // ++polish for publishing
-    // excape everything before printing
     // fix && prepare the texts
-// eliminate all warnings
-// add to both websites
-// ++add a global function to print?
+    // eliminate all warnings
+// add to 3 websites
+// ++add a global function to print? or suggest to integrate via echo do_shortcode('[]')'
 // ++option to print automatically?
     // ++is it allowed to make the gutenberg block??
-// ++more styles
 // ++maybe an option with schema?
 // ++some hints how it will work
 /* admin settings
@@ -884,3 +900,6 @@ function image($a) {
 // ++ preview using 1-tile layout && api
 // override global with shortcode attributes and all with local on-page meta settings
     // ++make multiple in terms of css
+    // attributes are settings: inherit if unset, override if is set
+    // attributes are meta boxes: same, but can have s="%slug" or category or category only..
+// settings for empty behavior (nothing selected or nothing found - think about it)
