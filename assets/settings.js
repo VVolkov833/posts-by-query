@@ -8,7 +8,7 @@ jQuery( document ).ready( $ => {
             $self.prevAll( 'button' ).html( 'No' )?.focus();
         };
 
-        $( b ).after( `<input type="button" value="+" class="clear1" title="Clear"/>` ).next().on( 'click', clear );
+        $( b ).after( `<input type="button" value="+" class="empty_value" title="Empty the value"/>` ).next().on( 'click', clear );
 
     });
 

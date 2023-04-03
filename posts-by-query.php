@@ -23,7 +23,8 @@ define( 'FCPPBK_DEV', true );
 define( 'FCPPBK_VER', get_file_data( __FILE__, [ 'ver' => 'Version' ] )[ 'ver' ] . ( FCPPBK_DEV ? time() : '' ) );
 define( 'FCPPBK_SET', FCPPBK_PREF.'settings' );
 
-function layout_options($list_length = 0) {
+
+function layout_variants($list_length = 0) {
     $list_length = is_numeric( $list_length ) ? $list_length : 10;
     return [
         '2-columns' => [
@@ -60,7 +61,7 @@ function layout_options($list_length = 0) {
     ];
 }
 
-function styling_options() {
+function get_styling_variants() { // ++add by scanning the folder
     return [
         '' => 'None',
         'style-1' => 'Style 1',
@@ -68,7 +69,7 @@ function styling_options() {
     ];
 }
 
-function default_values() {
+function get_default_values() { // apply on install && only planned to be usef in fields, which must not be empty // ++ turn to the constant
     return [
         'main-color' => '#007cba',
         'secondary-color' => '#abb8c3',
@@ -82,18 +83,18 @@ function default_values() {
 
 // fill in the initial settings
 register_activation_hook( __FILE__, function() {
-    add_option( FCPPBK_SET, default_values() );
+    add_option( FCPPBK_SET, get_default_values() );
 });
 
-// admin interface
+// admin interface for posts
 add_action( 'add_meta_boxes', function() {
     if ( !current_user_can( 'administrator' ) ) { return; }
-    if ( empty( apply_to_post_types() ) ) { return; }
+    if ( empty( get_types_to_apply_to() ) ) { return; }
     add_meta_box(
         'fcp-posts-by-query',
         'Posts by Query',
         __NAMESPACE__.'\metabox_query',
-        apply_to_post_types(),
+        get_types_to_apply_to(),
         'normal',
         'low'
     );
@@ -102,7 +103,12 @@ add_action( 'add_meta_boxes', function() {
 add_action( 'admin_enqueue_scripts', function() {
 
     if ( !current_user_can( 'administrator' ) ) { return; }
-    $files = [ 'post' => [ 'metabox', 'advisor' ], 'settings_page_posts-by-query' => [ 'settings', 'color', 'media', 'codemirror' ] ];
+    $files = [ // $screen->base => [ files names ]
+        'post' => [ 'metabox', 'advisor' ],
+        'settings_page_posts-by-query' => [ 'settings', 'color', 'media', 'codemirror' ]
+    ];
+
+
     $screen = get_current_screen();
     if ( !isset( $screen ) || !is_object( $screen ) || !isset( $files[ $screen->base ] ) ) { return; }
 
@@ -123,11 +129,11 @@ add_action( 'admin_enqueue_scripts', function() {
         if ( $ext === 'js' ) { wp_enqueue_script( $handle, $url, [], FCPPBK_VER, false ); }
     }
 
-    // color picker
+    // wp color picker
     wp_enqueue_script( 'wp-color-picker' );
     wp_enqueue_style( 'wp-color-picker' );
 
-    // the css editor
+    // css editor - default wp codemirror
     wp_localize_script( 'jquery', 'cm_settings', [ 'codeEditor' => wp_enqueue_code_editor( ['type' => 'text/css'] ) ] );
     wp_enqueue_script( 'wp-theme-plugin-editor' );
     wp_enqueue_style( 'wp-codemirror' );
@@ -136,18 +142,17 @@ add_action( 'admin_enqueue_scripts', function() {
     wp_enqueue_media();
 });
 
-// api to fetch the posts
-// api to fetch the query
+// api to fetch the posts by search query or by id-s
 add_action( 'rest_api_init', function () {
 
     $route_args = function($results_format) {
 
-        if ( empty( select_from_post_types() ) ) {
+        if ( empty( get_types_to_search_among() ) ) {
             return new \WP_Error( 'post_type_not_selected', 'Post type not selected', [ 'status' => 404 ] );
         }
 
         $wp_query_args = [
-            'post_type' => select_from_post_types(),
+            'post_type' => get_types_to_search_among(),
             'post_status' => 'publish',
             //'sentence' => true,
             'posts_per_page' => 20,
@@ -162,10 +167,10 @@ add_action( 'rest_api_init', function () {
                 // $wp_query_args += [ 'orderby' => 'title', 'order' => 'ASC' ]; // autocomplete orders by title anyways
             break;
             case ( 'query' ):
-                $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC' ];
+                $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC' ]; // ++ add option to settings. alt var = relevance
                 $format_output = function( $p ) {
                     $date = wp_date( get_option( 'date_format', 'j F Y' ), strtotime( $p->post_date ) );
-                    return [ 'id' => $p->ID, 'title' => $p->post_title . ' ('.public_post_types()[$p->post_type].', '.$date.')' ];
+                    return [ 'id' => $p->ID, 'title' => $p->post_title . ' ('.get_public_post_types()[$p->post_type].', '.$date.')' ];
                 };
             break;
         }
@@ -272,7 +277,7 @@ function metabox_query() {
         if ( !empty( $ids ) ) {
 
             $search = new \WP_Query( [
-                //'post_type' => select_from_post_types(), // commented to keep on accident save. filter still works in shortcode
+                //'post_type' => get_types_to_search_among(), // commented to keep on accident save. filter still works in shortcode
                 //'post_status' => 'publish', // same
                 'post__in' => $ids,
                 'orderby' => 'post__in',
@@ -301,7 +306,7 @@ function metabox_query() {
 }
 
 
-function public_post_types() {
+function get_public_post_types() {
     static $store = [];
 
     if ( !empty( $store ) ) { return $store; }
@@ -317,6 +322,9 @@ function public_post_types() {
 
     return $store;
 }
+function filter_by_public_types($types = []) { // list of types is among the list of public ones
+    return array_intersect( array_keys( get_public_post_types() ), $types ?: [] );
+}
 
 function get_settings() {
     static $settings = [];
@@ -325,11 +333,11 @@ function get_settings() {
     return $settings;
 }
 
-function apply_to_post_types() {
-    return array_intersect( array_keys( public_post_types() ), get_settings()['apply-to'] ?? [] );
+function get_types_to_apply_to() {
+    return filter_by_public_types( get_settings()['apply-to'] );
 }
-function select_from_post_types() {
-    return array_intersect( array_keys( public_post_types() ), get_settings()['select-from'] ?? [] );
+function get_types_to_search_among() {
+    return filter_by_public_types( get_settings()['select-from'] );
 }
 
 // save meta data
@@ -341,7 +349,7 @@ add_action( 'save_post', function( $postID ) {
     if ( !current_user_can( 'administrator' ) ) { return; }
 
     $post = get_post( $postID );
-    if ( $post->post_type === 'revision' ) { return; } // update_post_meta fixes the id to the parent, but id can be used before
+    if ( $post->post_type === 'revision' ) { return; } // kama has a different solution
 
     $fields = [ 'variants', 'query', 'posts' ];
 
@@ -361,24 +369,24 @@ function sanitize_meta( $value, $field, $postID ) {
 
     switch ( $field ) {
         case ( 'variants' ):
-            return in_array( $value, ['query', 'list'] ) ? $value : 'query'; // ++ make the list in one place and select default as [0]
+            return in_array( $value, ['query', 'list'] ) ? $value : 'query';
         break;
         case ( 'query' ):
             return sanitize_text_field( $value );
         break;
         case ( 'posts' ):
             return array_values( array_filter( $value, 'is_numeric' ) );
-            // post-type & is-published filters are performed before printing on the front-end to not ruin on save if something changed in settings
+            // post-type & is-published filters are applied before printing on the front-end to not ruin on save if global settings are changed
         break;
     }
 
     return '';
 }
 
-add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
+add_shortcode( FCPPBK_SLUG, function() { // ++ check outside of main loop
 
-    if ( empty( select_from_post_types() ) ) { return; }
-    if ( !in_array( get_post_type(), apply_to_post_types() ) ) { return; }
+    if ( empty( get_types_to_search_among() ) ) { return; }
+    if ( !in_array( get_post_type(), get_types_to_apply_to() ) ) { return; }
 
     $settings = get_settings();
 
@@ -414,7 +422,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
         return strpos( $key, FCPPBK_PREF ) === 0;
     }, ARRAY_FILTER_USE_KEY ) );
 
-    $layouts = layout_options( $settings['limit-the-list'] )[ $settings['layout'] ]['l'];
+    $layouts = layout_variants( $settings['limit-the-list'] )[ $settings['layout'] ]['l'];
 
     $limit = array_reduce( $layouts, function( $result, $item ) {
         $result += $item;
@@ -422,7 +430,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside the loop && fix!!
     }, 0 );
 
     $wp_query_args = [
-        'post_type' => select_from_post_types(),
+        'post_type' => get_types_to_search_among(),
         'post_status' => 'publish',
         'posts_per_page' => $limit,
         'post__not_in' => [ get_the_ID() ],
@@ -566,6 +574,8 @@ add_action( 'admin_menu', function() {
 // print the settings page
 add_action( 'admin_init', function() {
 
+    // ++ add filters to call it only on particular screen!!!
+
     $settings = settings_settings();
     $fields_structure = settings_structure();
 
@@ -602,7 +612,7 @@ add_action( 'admin_init', function() {
 
     $add_section = function( $section, $title, $slug = '' ) use ( &$settings, $add_field ) {
 
-        $settings->section = $slug ?? sanitize_title( $title );
+        $settings->section = $slug ?: sanitize_title( $title );
         add_settings_section( $settings->section, $title, '', $settings->page );
 
         foreach ( $section as $v ) {
@@ -627,8 +637,8 @@ function settings_structure() {
         'Styling settings' => [
             ['Main color', 'color'],
             ['Secondary color', 'color'],
-            ['Layout', 'select', [ 'options' => '%layout_options' ]],
-            ['Style', 'select', [ 'options' => '%styling_options' ]],
+            ['Layout', 'select', [ 'options' => '%layout_variants' ]],
+            ['Style', 'select', [ 'options' => '%get_styling_variants' ]],
             ['Additional CSS', 'textarea', [ 'filter' => 'css' ]],
             ['Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout contains the List, this number will limit the amount of posts in it', 'filter' => 'integer' ]],
             ['Default thumbnail', 'image', [ 'comment' => 'This image is shown, if a post doesn\'t have the featured image', 'className' => 'image' ]],
@@ -645,18 +655,18 @@ function settings_structure() {
         'Other settings' => [
             ['Headline', 'text'],
             ['CSS Class', 'text'],
-            ['Select from', 'checkboxes', [ 'options' => '%public_post_types' ]],
-            ['Apply to', 'checkboxes', [ 'options' => '%public_post_types', 'comment' => 'This will add the option to query the posts to selected post types editor bottom' ]],
+            ['Select from', 'checkboxes', [ 'options' => '%get_public_post_types' ]],
+            ['Apply to', 'checkboxes', [ 'options' => '%get_public_post_types', 'comment' => 'This will add the option to query the posts to selected post types editor bottom' ]],
         ],
     ];
 
     // dynamic options to add to the structure
     $options = [];
-    $options['layout_options'] = array_map( function( $a ) {
+    $options['layout_variants'] = array_map( function( $a ) {
         return $a['t'];
-    }, layout_options() );
+    }, layout_variants() );
 
-    $options['styling_options'] = styling_options();
+    $options['get_styling_variants'] = get_styling_variants();
 
     $thumbnail_sizes = wp_get_registered_image_subsizes();
     $options['thumbnail_sizes'] = [ '' => 'No image', 'full' => 'Full' ] + array_reduce( array_keys( $thumbnail_sizes ), function( $result, $item ) use ( $thumbnail_sizes ) {
@@ -664,7 +674,7 @@ function settings_structure() {
         return $result;
     }, [] );
 
-    $options['public_post_types'] = public_post_types();
+    $options['get_public_post_types'] = get_public_post_types();
 
     foreach( $fields_structure as &$v ) {
         foreach ( $v as &$w ) {
@@ -690,7 +700,7 @@ function settings_sanitize( $values ){
 
     //print_r( $values ); exit;
     $fields_structure = settings_structure();
-    $default_values = default_values();
+    $get_default_values = get_default_values();
     
     $filters = [
         'integer' => function($v) {
@@ -729,7 +739,7 @@ function settings_sanitize( $values ){
                 'options' => $atts['options'] ?? null,
                 'option' => $atts['option'] ?? null,
                 'filter' => $atts['filter'] ?? null,
-                'default' => $default_values[ $slug ] ?? null,
+                'default' => $get_default_values[ $slug ] ?? null,
                 // ++add condition if gotta be default and not empty
             ]);
         }
@@ -880,13 +890,13 @@ function image($a) {
 
 // ++more styles
     // giessler
-    // preview?
-// change the class names in settings.js
 // ++polish for publishing
+    // comment the codes!!
     // fix && prepare the texts
     // eliminate all warnings
 // add to 3 websites
 // ++add a global function to print? or suggest to integrate via echo do_shortcode('[]')'
+
 // ++option to print automatically?
     // ++is it allowed to make the gutenberg block??
 // ++maybe an option with schema?
@@ -895,11 +905,12 @@ function image($a) {
     only admin checkbox (or anyone, who can edit the post)
     get the first image if no featured
     mode for preview only
+    // settings for empty behavior (nothing selected or nothing found - think about it)
+    // print after the_content() option
 */
 // ++ drag and drop to change the order of particular posts
-// ++ preview using 1-tile layout && api
+// ++ preview using 1-tile layout && maybe api
 // override global with shortcode attributes and all with local on-page meta settings
     // ++make multiple in terms of css
     // attributes are settings: inherit if unset, override if is set
     // attributes are meta boxes: same, but can have s="%slug" or category or category only..
-// settings for empty behavior (nothing selected or nothing found - think about it)

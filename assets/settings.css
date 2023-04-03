@@ -46,7 +46,7 @@ form h2::after {
     object-position: center top;
 }
 
-.clear1 {
+.empty_value {
     appearance: none;
     display: inline-block;
     vertical-align: top;
@@ -55,8 +55,4 @@ form h2::after {
     border-radius: 50%;
     cursor: pointer;
     transform: rotate(45deg);
-}
-
-.wp-picker-container .wp-picker-clear {
-    xdisplay: none;
 }
