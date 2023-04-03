@@ -24,7 +24,7 @@ define( 'FCPPBK_VER', get_file_data( __FILE__, [ 'ver' => 'Version' ] )[ 'ver' ]
 define( 'FCPPBK_SET', FCPPBK_PREF.'settings' );
 
 
-function layout_variants($list_length = 0) {
+function layout_variants($list_length = 0) { // ++ maybe switch to const
     $list_length = is_numeric( $list_length ) ? $list_length : 10;
     return [
         '2-columns' => [
@@ -145,7 +145,7 @@ add_action( 'admin_enqueue_scripts', function() {
 // api to fetch the posts by search query or by id-s
 add_action( 'rest_api_init', function () {
 
-    $route_args = function($results_format) {
+    $route_args = function($search_by) {
 
         if ( empty( get_types_to_search_among() ) ) {
             return new \WP_Error( 'post_type_not_selected', 'Post type not selected', [ 'status' => 404 ] );
@@ -162,7 +162,7 @@ add_action( 'rest_api_init', function () {
             return [ 'id' => $p->ID, 'title' => $p->post_title ]; // get_the_title() forces different quotes in different languages or so
         };
 
-        switch ( $results_format ) {
+        switch ( $search_by ) {
             case ( 'list' ):
                 // $wp_query_args += [ 'orderby' => 'title', 'order' => 'ASC' ]; // autocomplete orders by title anyways
             break;
@@ -383,7 +383,8 @@ function sanitize_meta( $value, $field, $postID ) {
     return '';
 }
 
-add_shortcode( FCPPBK_SLUG, function() { // ++ check outside of main loop
+
+add_shortcode( FCPPBK_SLUG, function() { // ++ check outside of main loop (as get_the_ID is used) and on an archive page
 
     if ( empty( get_types_to_search_among() ) ) { return; }
     if ( !in_array( get_post_type(), get_types_to_apply_to() ) ) { return; }
@@ -391,23 +392,27 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside of main loop
     $settings = get_settings();
 
     // styles
+    // inline the global settings
     $handle = FCPPBK_PREF.'settings';
     wp_register_style( $handle, false );
     wp_enqueue_style( $handle );
     wp_add_inline_style( $handle, '.'.FCPPBK_SLUG.'{--main-color:'.$settings['main-color'].';--secondary-color:'.$settings['secondary-color'].';}' );
 
+    // layout
     $path = 'css-layout/'.$settings['layout'].'.css';
     $handle = FCPPBK_PREF.'layout';
     if ( is_file( __DIR__.'/' . $path ) ) {
         wp_enqueue_style( $handle, plugins_url( '/' ,__FILE__ ) . $path, [], FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/' . $path ) );
     }
 
+    // style
     $path = 'css-styling/'.$settings['style'].'.css';
     $handle = FCPPBK_PREF.'style';
     if ( is_file( __DIR__.'/' . $path ) ) {
         wp_enqueue_style( $handle, plugins_url( '/' ,__FILE__ ) . $path, [], FCPPBK_DEV ? FCPPBK_VER : FCPPBK_VER.'.'.filemtime( __DIR__.'/' . $path ) );
     }
 
+    // inline the additional CSS
     $handle = FCPPBK_PREF.'additional';
     if ( $settings['additional-css'] ?? trim( $settings['additional-css'] ) ) {
         wp_register_style( $handle, false );
@@ -416,15 +421,14 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside of main loop
     }
 
 
-    $metas = array_map( function( $value ) {
+    $metas = array_map( function( $value ) { // get the meta values
         return $value[0];
-    }, array_filter( get_post_custom(), function($key) {
+    }, array_filter( get_post_custom(), function($key) { // get only meta for the plugin
         return strpos( $key, FCPPBK_PREF ) === 0;
     }, ARRAY_FILTER_USE_KEY ) );
 
-    $layouts = layout_variants( $settings['limit-the-list'] )[ $settings['layout'] ]['l'];
-
-    $limit = array_reduce( $layouts, function( $result, $item ) {
+    $layouts = layout_variants( $settings['limit-the-list'] )[ $settings['layout'] ]['l']; // [columns, list with limit]
+    $limit = array_reduce( $layouts, function( $result, $item ) { // count the limit to select by the query
         $result += $item;
         return $result;
     }, 0 );
@@ -433,11 +437,12 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside of main loop
         'post_type' => get_types_to_search_among(),
         'post_status' => 'publish',
         'posts_per_page' => $limit,
-        'post__not_in' => [ get_the_ID() ],
+        'post__not_in' => [ get_the_ID() ], // exclude self // ++ is_singular()( get_queried_object()->ID )
     ];
 
-    $results_format = $metas[ FCPPBK_PREF.'variants' ];
-    switch ( $results_format ) {
+    $search_by = $metas[ FCPPBK_PREF.'variants' ];
+
+    switch ( $search_by ) {
         case ( 'list' ):
             $ids = unserialize( $metas[ FCPPBK_PREF.'posts' ] );
             if ( empty( $ids ) ) { return; }
@@ -493,9 +498,10 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside of main loop
 
     $posts = [];
     while ( $search->have_posts() ) {
-        //$search->the_post(); // has the conflict with Glossary (Premium) plugin, which flushes the first post in a loop to the root one with the_excerpt()
+        //$search->the_post(); // has the conflict with Glossary (Premium) plugin, which flushes the first post in a loop to the root one by the_excerpt()
         $p = $search->next_post();
 
+        // prepare the values to fill in the template
         $categories = isset( $settings['hide-category'] ) ? [] : get_the_category( $p );
 
 		$thumbnail = $settings['thumbnail-size'] ? (
@@ -537,6 +543,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside of main loop
     ];
     $ind = 0;
 
+    // fill in the template
     foreach ( $layouts as $k => $v ) {
         for ( $i = 0; $i < $v; $i++ ) {
             if ( !isset( $posts[ $ind ] ) ) { break 2; }
@@ -676,6 +683,7 @@ function settings_structure() {
 
     $options['get_public_post_types'] = get_public_post_types();
 
+    // fill in the structure with dynamic options
     foreach( $fields_structure as &$v ) {
         foreach ( $v as &$w ) {
             if ( !$w[2] || !$w[2]['options'] || !is_string( $w[2]['options'] ) || strpos( $w[2]['options'], '%' ) !== 0 ) { continue; }
@@ -739,8 +747,7 @@ function settings_sanitize( $values ){
                 'options' => $atts['options'] ?? null,
                 'option' => $atts['option'] ?? null,
                 'filter' => $atts['filter'] ?? null,
-                'default' => $get_default_values[ $slug ] ?? null,
-                // ++add condition if gotta be default and not empty
+                'default' => $get_default_values[ $slug ] ?? null, // the fallback value ++for future 'must be filled' values
             ]);
         }
     }
@@ -888,11 +895,13 @@ function image($a) {
     <?php
 }
 
+
+// test outside the loop :440
+// filter for admin_init :582
 // ++more styles
     // giessler
 // ++polish for publishing
-    // comment the codes!!
-    // fix && prepare the texts
+    // improve && prepare the texts
     // eliminate all warnings
 // add to 3 websites
 // ++add a global function to print? or suggest to integrate via echo do_shortcode('[]')'
