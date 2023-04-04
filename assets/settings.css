@@ -56,3 +56,7 @@ form h2::after {
     cursor: pointer;
     transform: rotate(45deg);
 }
+
+.CodeMirror-placeholder {
+    color: #a7a7a7 !important;
+}

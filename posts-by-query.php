@@ -584,11 +584,17 @@ add_action( 'admin_menu', function() {
 // print the settings page
 add_action( 'admin_init', function() {
 
-    global $pagenow;
-    if ( $pagenow !== 'options-general.php' || $_GET['page'] !== 'posts-by-query' ) { return; } // get_current_screen() doesn't work here
     if ( !current_user_can( 'administrator' ) ) { return; }
 
     $settings = settings_get();
+    // register and save the settings group
+    register_setting( $settings->group, $settings->varname, __NAMESPACE__.'\settings_sanitize' ); // register, save, nonce
+
+
+    // print settings
+    global $pagenow;
+    if ( $pagenow !== 'options-general.php' || $_GET['page'] !== 'posts-by-query' ) { return; } // get_current_screen() doesn't work here
+
     $fields_structure = settings_structure();
 
     $add_field = function( $title, $type = '', $atts = [] ) use ( $settings ) {
@@ -637,7 +643,6 @@ add_action( 'admin_init', function() {
         $add_section( $v, $k );
     }
 
-    register_setting( $settings->group, $settings->varname, __NAMESPACE__.'\settings_sanitize' ); // register, save, nonce
 });
 
 function settings_structure() {
@@ -901,14 +906,13 @@ function image($a) {
 }
 
 
-// codemirror placeholder - color to grey
+// eliminate all warnings
 // ++more styles
     // giessler
 // ++polish for publishing
     // improve && prepare the texts
-    // eliminate all warnings
+        // suggest to integrate via echo do_shortcode('[]')'
 // add to 3 websites
-// ++add a global function to print? or suggest to integrate via echo do_shortcode('[]')'
 
 // ++ turn posts-by-query into a constant and avoid conflict with FCPPBK_SET
 // ++option to print automatically?
