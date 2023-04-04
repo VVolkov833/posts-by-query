@@ -6,13 +6,6 @@
     width: calc(33.333% - 20px);
     margin-bottom: 50px;
 }
-.fcppbk-2-columns-1-list ul {
-    padding: 0;
-}
-.fcppbk-2-columns-1-list ul li {
-    margin-top: 0; 
-    list-style: none;
-}
 
 @media (max-width: 767px) {
     .fcppbk-2-columns-1-list > div {

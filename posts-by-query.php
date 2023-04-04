@@ -541,7 +541,11 @@ add_shortcode( FCPPBK_SLUG, function() {
 
     $result = [
         'headline' => $settings['headline'] ? $fill_template( [ 'headline' => $settings['headline'] ], 'headline' ) : '',
-        'css_class' => FCPPBK_SLUG . ' ' . FCPPBK_PREF.$settings['layout'] . ' ' . $settings['css-class'],
+        'css_class' =>
+            FCPPBK_SLUG . ' '
+            .FCPPBK_PREF.$settings['layout'] . ' '
+            .FCPPBK_PREF.$settings['style'] . ' '
+            .$settings['css-class'],
         'column' => '',
         'list' => '',
     ];

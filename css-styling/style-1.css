@@ -1,46 +1,46 @@
-.fcppbk article {
+.fcppbk-style-1 article {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     justify-content: flex-start;
 }
 
-.fcppbk-thumbnail {
+.fcppbk-style-1 .fcppbk-thumbnail {
     display: block;
     width: 100%;
     margin-bottom: 20px;
 }
-.fcppbk-thumbnail img {
+.fcppbk-style-1 .fcppbk-thumbnail img {
     width: 100%;
     height: 250px;
     object-fit: cover;
     object-position: center top;
 }
-.fcppbk-thumbnail img.blank {
+.fcppbk-style-1 .fcppbk-thumbnail img.blank {
     background-color: var(--main-color);
 }
 
-.fcppbk header {
+.fcppbk-style-1 header {
     margin-bottom: 15px;
 }
-.fcppbk header > * {
+.fcppbk-style-1 header > * {
     margin: 0 0 12px;
 }
-.fcppbk h3,
-.fcppbk h3 a {
+.fcppbk-style-1 h3,
+.fcppbk-style-1 h3 a {
     color: inherit;
 }
-.fcppbk-date {
+.fcppbk-style-1 .fcppbk-date {
     font-size: 90%;
     font-style: italic;
 }
-.fcppbk-excerpt {
+.fcppbk-style-1 .fcppbk-excerpt {
     margin-top: 15px;
     margin-bottom: 22px;
 }
 
 
-.fcppbk .fcppbk-button {
+.fcppbk-style-1 .fcppbk-button {
     width: auto;
     margin-top: auto;
     padding: 6px 16px 4px;
@@ -50,8 +50,21 @@
 }
 
 @media (max-width: 767px) {
-    .fcppbk-thumbnail img {
+    .fcppbk-style-1 .fcppbk-thumbnail img {
         height: auto;
         max-height: 400px;
     }
+}
+
+
+.fcppbk-style-1 ul {
+    padding: 0;
+}
+.fcppbk-style-1 ul li {
+    margin: 0 0 16px; 
+    list-style: none;
+    line-height:1.4;
+}
+.fcppbk-style-1 ul a {
+    color: inherit;
 }
