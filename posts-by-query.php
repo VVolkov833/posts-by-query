@@ -344,7 +344,7 @@ function get_types_to_search_among() {
 add_action( 'save_post', function( $postID ) {
 
     if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) { return; }
-    if ( !wp_verify_nonce( $_POST[ FCPPBK_PREF.'nonce' ], FCPPBK_PREF.'nonce' ) ) { return; }
+    if ( empty( $_POST[ FCPPBK_PREF.'nonce' ] ) || !wp_verify_nonce( $_POST[ FCPPBK_PREF.'nonce' ], FCPPBK_PREF.'nonce' ) ) { return; }
     //if ( !current_user_can( 'edit_post', $postID ) ) { return; }
     if ( !current_user_can( 'administrator' ) ) { return; }
 
@@ -384,7 +384,9 @@ function sanitize_meta( $value, $field, $postID ) {
 }
 
 
-add_shortcode( FCPPBK_SLUG, function() { // ++ check outside of main loop (as get_the_ID is used) and on an archive page
+add_shortcode( FCPPBK_SLUG, function() {
+
+    if ( is_admin() ) { return; }
 
     if ( empty( get_types_to_search_among() ) ) { return; }
     if ( !in_array( get_post_type(), get_types_to_apply_to() ) ) { return; }
@@ -433,11 +435,13 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside of main loop (as ge
         return $result;
     }, 0 );
 
+    $current_id = empty( get_queried_object() ) ? 0 : get_queried_object()->ID;
+
     $wp_query_args = [
         'post_type' => get_types_to_search_among(),
         'post_status' => 'publish',
         'posts_per_page' => $limit,
-        'post__not_in' => [ get_queried_object()->ID ], // exclude self
+        'post__not_in' => [ $current_id ], // exclude self
     ];
 
     $search_by = $metas[ FCPPBK_PREF.'variants' ];
@@ -634,7 +638,7 @@ add_action( 'admin_init', function() {
         add_settings_section( $settings->section, $title, '', $settings->page );
 
         foreach ( $section as $v ) {
-            $add_field( $v[0], $v[1], $v[2] );
+            $add_field( $v[0], $v[1], $v[2] ?? [] );
         }
     };
 
@@ -696,7 +700,7 @@ function settings_structure() {
     // fill in the structure with dynamic options
     foreach( $fields_structure as &$v ) {
         foreach ( $v as &$w ) {
-            if ( !$w[2] || !$w[2]['options'] || !is_string( $w[2]['options'] ) || strpos( $w[2]['options'], '%' ) !== 0 ) { continue; }
+            if ( empty( $w[2] ) || empty( $w[2]['options'] ) || !is_string( $w[2]['options'] ) || strpos( $w[2]['options'], '%' ) !== 0 ) { continue; }
             $w[2]['options'] = $options[ substr( $w[2]['options'], 1 ) ] ?? [];
         }
     }
@@ -765,17 +769,17 @@ function settings_sanitize( $values ){
 	foreach( $values as $k => &$v ){
         $trial = $trials[ $k ];
 
-        if ( $trial->filter ) {
+        if ( !empty( $trial->filter ) ) {
             $v = $filters[ $trial->filter ] ? $filters[ $trial->filter ]( $v ) : $v;
         }
-        if ( $trial->options ) {
+        if ( !empty( $trial->options ) ) {
             if ( is_array( $v ) ) {
                 $v = array_intersect( $v, array_keys( $trial->options ) );
             } else {
                 $v = in_array( $v, array_keys( $trial->options ) ) ? $v : '';
             }
         }
-        if ( $trial->option ) {
+        if ( !empty( $trial->option ) ) {
             $v = $v === $trial->option ? $v : '';
         }
         if ( in_array( $trial->type, ['text', 'textarea'] ) ) {
@@ -906,7 +910,6 @@ function image($a) {
 }
 
 
-// eliminate all warnings
 // ++more styles
     // giessler
 // ++polish for publishing
