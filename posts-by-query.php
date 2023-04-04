@@ -91,7 +91,7 @@ add_action( 'add_meta_boxes', function() {
     if ( !current_user_can( 'administrator' ) ) { return; }
     if ( empty( get_types_to_apply_to() ) ) { return; }
     add_meta_box(
-        'fcp-posts-by-query',
+        FCPPBK_PREF.'posts-by-query',
         'Posts by Query',
         __NAMESPACE__.'\metabox_query',
         get_types_to_apply_to(),
@@ -437,7 +437,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside of main loop (as ge
         'post_type' => get_types_to_search_among(),
         'post_status' => 'publish',
         'posts_per_page' => $limit,
-        'post__not_in' => [ get_the_ID() ], // exclude self // ++ is_singular()( get_queried_object()->ID )
+        'post__not_in' => [ get_queried_object()->ID ], // exclude self
     ];
 
     $search_by = $metas[ FCPPBK_PREF.'variants' ];
@@ -559,9 +559,12 @@ add_shortcode( FCPPBK_SLUG, function() { // ++ check outside of main loop (as ge
 
 // settings page
 add_action( 'admin_menu', function() {
-    // capabilities filter is inside
 	add_options_page( 'Posts by Query settings', 'Posts by Query', 'switch_themes', 'posts-by-query', function() {
-        $settings = settings_settings();
+
+        if ( !current_user_can( 'administrator' ) ) { return; } // along with switch_themes above, it is still needed
+
+        $settings = settings_get();
+
         ?>
         <div class="wrap">
             <h2><?php echo get_admin_page_title() ?></h2>
@@ -581,9 +584,11 @@ add_action( 'admin_menu', function() {
 // print the settings page
 add_action( 'admin_init', function() {
 
-    // ++ add filters to call it only on particular screen!!!
+    global $pagenow;
+    if ( $pagenow !== 'options-general.php' || $_GET['page'] !== 'posts-by-query' ) { return; } // get_current_screen() doesn't work here
+    if ( !current_user_can( 'administrator' ) ) { return; }
 
-    $settings = settings_settings();
+    $settings = settings_get();
     $fields_structure = settings_structure();
 
     $add_field = function( $title, $type = '', $atts = [] ) use ( $settings ) {
@@ -694,7 +699,7 @@ function settings_structure() {
     return $fields_structure;
 }
 
-function settings_settings() {
+function settings_get() {
     return (object) [
         'varname' => FCPPBK_SET,
         'group' => FCPPBK_SET.'-group',
@@ -896,8 +901,7 @@ function image($a) {
 }
 
 
-// test outside the loop :440
-// filter for admin_init :582
+// codemirror placeholder - color to grey
 // ++more styles
     // giessler
 // ++polish for publishing
@@ -906,6 +910,7 @@ function image($a) {
 // add to 3 websites
 // ++add a global function to print? or suggest to integrate via echo do_shortcode('[]')'
 
+// ++ turn posts-by-query into a constant and avoid conflict with FCPPBK_SET
 // ++option to print automatically?
     // ++is it allowed to make the gutenberg block??
 // ++maybe an option with schema?
