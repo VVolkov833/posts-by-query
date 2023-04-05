@@ -16,19 +16,19 @@ namespace FCP\PostsByQuery;
 defined( 'ABSPATH' ) || exit;
 
 
-define( 'FCPPBK_DEV', true );
+define( 'FCPPBK_DEV', false );
 define( 'FCPPBK_VER', get_file_data( __FILE__, [ 'ver' => 'Version' ] )[ 'ver' ] . ( FCPPBK_DEV ? time() : '' ) );
 
-define( 'FCPPBK_URL', plugins_url( '/' ,__FILE__ ) );
-define( 'FCPPBK_DIR', __DIR__.'/' );
+define( 'FCPPBK_URL', plugin_dir_url( __FILE__ ) );
+define( 'FCPPBK_DIR', plugin_dir_path( __FILE__ ) );
 
 
-require __DIR__ . '/inc/config.php';
-require __DIR__ . '/inc/functions.php';
-require __DIR__ . '/inc/form-fields.php';
-require __DIR__ . '/inc/settings-page.php';
-require __DIR__ . '/inc/meta-boxes.php';
-require __DIR__ . '/inc/shortcode.php';
+require FCPPBK_DIR . 'inc/config.php';
+require FCPPBK_DIR . 'inc/functions.php';
+require FCPPBK_DIR . 'inc/form-fields.php';
+require FCPPBK_DIR . 'inc/settings-page.php';
+require FCPPBK_DIR . 'inc/meta-boxes.php';
+require FCPPBK_DIR . 'inc/shortcode.php';
 
 
 // fill in the initial settings
@@ -44,7 +44,7 @@ register_activation_hook( __FILE__, function() {
 
 // ++polish for publishing
     // the about-the-plugin texts
-    // test everything again with warnings
+    // !!title and description must be more like for printing to understans blah blah check out the competitors
 // after publishing add thumbnails and the preview page
 
 // ++ if Posts by Search Query & Date become empty, the old query still prints what was found
