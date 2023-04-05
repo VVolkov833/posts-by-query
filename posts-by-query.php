@@ -398,7 +398,7 @@ add_shortcode( FCPPBK_SLUG, function() {
     $handle = FCPPBK_PREF.'settings';
     wp_register_style( $handle, false );
     wp_enqueue_style( $handle );
-    wp_add_inline_style( $handle, '.'.FCPPBK_SLUG.'{--main-color:'.$settings['main-color'].';--secondary-color:'.$settings['secondary-color'].';}' );
+    wp_add_inline_style( $handle, '.'.FCPPBK_SLUG.'{--main-color:'.$settings['main-color'].';--secondary-color:'.$settings['secondary-color'].'}' );
 
     // layout
     $path = 'css-layout/'.$settings['layout'].'.css';
@@ -419,7 +419,7 @@ add_shortcode( FCPPBK_SLUG, function() {
     if ( $settings['additional-css'] ?? trim( $settings['additional-css'] ) ) {
         wp_register_style( $handle, false );
         wp_enqueue_style( $handle );
-        wp_add_inline_style( $handle, $settings['additional-css'] );
+        wp_add_inline_style( $handle, css_minify( $settings['additional-css'] ) );
     }
 
 
@@ -564,6 +564,15 @@ add_shortcode( FCPPBK_SLUG, function() {
 
 });
 
+function css_minify($css) {
+    $css = preg_replace( '/\/\*(?:.*?)*\*\//', '', $css ); // remove comments
+    $css = preg_replace( '/\s+/', ' ', $css ); // one-line & only single speces
+    $css = preg_replace( '/ ?([\{\};:\>\~\+]) ?/', '$1', $css ); // remove spaces
+    $css = preg_replace( '/\+(\d)/', ' + $1', $css ); // restore spaces in functions
+    $css = preg_replace( '/(?:[^\}]*)\{\}/', '', $css ); // remove empty properties
+    $css = str_replace( [';}', '( ', ' )'], ['}', '(', ')'], $css ); // remove last ; and spaces
+    return trim( $css );
+};
 
 // settings page
 add_action( 'admin_menu', function() {
@@ -786,9 +795,8 @@ function settings_sanitize( $values ){
         if ( !empty( $trial->option ) ) {
             $v = $v === $trial->option ? $v : '';
         }
-        if ( in_array( $trial->type, ['text', 'textarea'] ) ) {
-            $v = sanitize_text_field( $v );
-        }
+        if ( $trial->type === 'text' ) { $v = sanitize_text_field( $v ); }
+        if ( $trial->type === 'textarea' ) { $v = sanitize_textarea_field( $v ); }
 
 	}
     //print_r( [$values, $trials] ); exit;
@@ -914,11 +922,10 @@ function image($a) {
 }
 
 
-// ++more styles
-    // giessler
+// ++apply to giessler
 // ++polish for publishing
     // improve && prepare the texts
-        // suggest to integrate via echo do_shortcode('[]')'
+        // suggest to integrate via if class exists echo do_shortcode('[]')'
 // add to 3 websites
 
 // ++ turn posts-by-query into a constant and avoid conflict with FCPPBK_SET
