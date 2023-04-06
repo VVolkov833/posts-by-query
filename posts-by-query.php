@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: FCP Posts by Search Query
-Description: Easy pick and add a list of relevant posts to particular pages with a search query or exact list of posts.
+Description: Implement a list of relevant posts to particular pages with a search query or exact list of posts. Easy pick and add.
 Version: 1.0.0
 Requires at least: 5.8
 Tested up to: 6.1

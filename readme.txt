@@ -14,13 +14,14 @@ FCP Posts by Search Query
 
 == Description ==
 
-Easy pick and add a list of relevant posts to particular pages with a search query or exact list of posts.
+Implement a list of relevant posts to particular pages with a search query or exact list of posts. Easy pick and add.
 
 = Features =
 
+* Prints the list of relevant posts by search query
+* Layouts and styling variants
 * Simple and flexible inteface for picking posts
 * Apply to any post / page / custom post-type
-* Layouts and styling variants
 * Implement with the \[fcppbk\] shortcode
 * It minifies the css before printing
 
