@@ -66,3 +66,4 @@ register_activation_hook( __FILE__, function() {
     // ++make multiple in terms of css
     // attributes are settings: inherit if unset, override if is set
     // attributes are meta boxes: same, but can have s="%slug" or category or category only..
+// ++ settings ling to the plugins page
