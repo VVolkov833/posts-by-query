@@ -5,7 +5,7 @@
 namespace FCP\PostsByQuery;
 defined( 'ABSPATH' ) || exit;
 
-add_shortcode( FCPPBK_SLUG, function() {
+add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!!
 
     if ( is_admin() ) { return; }
 
@@ -44,6 +44,7 @@ add_shortcode( FCPPBK_SLUG, function() {
         wp_add_inline_style( $handle, css_minify( $settings['additional-css'] ) );
     }
 
+    // wp_reset_query(); // ++ investigate when to apply
 
     $metas = array_map( function( $value ) { // get the meta values
         return $value[0];
@@ -64,6 +65,7 @@ add_shortcode( FCPPBK_SLUG, function() {
         'post_status' => 'publish',
         'posts_per_page' => $limit,
         'post__not_in' => [ $current_id ], // exclude self
+        // 'lang' => 'en, de', // ++make something for a taxonomy interfering??????
     ];
 
     $search_by = $metas[ FCPPBK_PREF.'variants' ];

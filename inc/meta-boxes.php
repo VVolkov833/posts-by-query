@@ -201,6 +201,7 @@ function metabox_query() {
                 //'post_status' => 'publish', // same
                 'post__in' => $ids,
                 'orderby' => 'post__in',
+                // 'lang' => 'en, de', // ++ not sure how to do best fot multi-lang websites
             ] );
             if ( $search->have_posts() ) {
                 while ( $search->have_posts() ) {
