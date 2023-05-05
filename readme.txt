@@ -27,7 +27,7 @@ Implement a list of relevant posts to particular pages with a search query or ex
 
 = Demo =
 
-Under construction
+[firmcatalyst.com/posts-by-search-query](https://firmcatalyst.com/posts-by-search-query/)
 
 = Usage =
 
