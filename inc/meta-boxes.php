@@ -131,10 +131,11 @@ add_action( 'rest_api_init', function () {
                 'search' => [
                     'description' => 'The search query',
                     'type'        => 'string',
+                    'required'    => true,
                     'validate_callback' => function($param) {
                         return trim( $param ) ? true : false;
                     },
-                    'sanitize_settings' => function($param, $request, $key) {
+                    'sanitize_callback' => function($param, \WP_REST_Request $request, $key) {
                         return sanitize_text_field( urldecode( $param ) ); // return htmlspecialchars( wp_unslash( urldecode( $param ) ) );
                     },
                 ],
@@ -198,10 +199,11 @@ function metabox_query() {
 
             $search = new \WP_Query( [
                 //'post_type' => get_types_to_search_among(), // commented to keep on accident save. filter still works in shortcode
+                'post_type' => 'any',
                 //'post_status' => 'publish', // same
                 'post__in' => $ids,
                 'orderby' => 'post__in',
-                // 'lang' => 'en, de', // ++ not sure how to do best fot multi-lang websites
+                'lang' => 'all', // ++ add the option to limit languages if needed
             ] );
             if ( $search->have_posts() ) {
                 while ( $search->have_posts() ) {

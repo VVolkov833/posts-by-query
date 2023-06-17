@@ -65,7 +65,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
         'post_status' => 'publish',
         'posts_per_page' => $limit,
         'post__not_in' => [ $current_id ], // exclude self
-        // 'lang' => 'en, de', // ++make something for a taxonomy interfering??????
+        'lang' => 'all',
     ];
 
     $search_by = $metas[ FCPPBK_PREF.'variants' ];
