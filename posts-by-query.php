@@ -5,7 +5,7 @@ Description: Implement a list of relevant posts to particular pages with a searc
 Version: 1.0.2
 Requires at least: 5.8
 Tested up to: 6.2
-Requires PHP: 8.0
+Requires PHP: 7.4
 Author: Firmcatalyst, Vadim Volkov, Aude Jamier
 Author URI: https://firmcatalyst.com
 License: GPL v3 or later
