@@ -2,9 +2,9 @@
 Contributors: Firmcatalyst
 Tags: posts, list posts
 Requires at least: 5.8
-Tested up to: 6.1
-Requires PHP: 7.4
-Stable tag: 1.0.0
+Tested up to: 6.2
+Requires PHP: 8.0
+Stable tag: 1.0.2
 Author: Firmcatalyst, Vadim Volkov, Aude Jamier
 Author URI: https://firmcatalyst.com
 License: GPL v3 or later
@@ -24,6 +24,7 @@ Implement a list of relevant posts to particular pages with a search query or ex
 * Apply to any post / page / custom post-type
 * Implement with the \[fcppbk\] shortcode
 * It minifies the css before printing
+* Polylang friendly
 
 = Demo =
 

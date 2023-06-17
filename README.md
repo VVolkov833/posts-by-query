@@ -10,6 +10,7 @@ Implement a list of relevant posts to particular pages with a search query or ex
 * Apply to any post / page / custom post-type
 * Implement with the \[fcppbk\] shortcode
 * It minifies the css before printing
+* Polylang friendly
 
 ## Demo
 
