@@ -48,7 +48,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
 
     $metas = array_map( function( $value ) { // get the meta values
         return $value[0];
-    }, array_filter( get_post_custom(), function($key) { // get only meta for the plugin
+    }, array_filter( get_post_meta( get_queried_object_id() ), function($key) { // get only meta for the plugin
         return strpos( $key, FCPPBK_PREF ) === 0;
     }, ARRAY_FILTER_USE_KEY ) );
 
