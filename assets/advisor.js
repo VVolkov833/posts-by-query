@@ -3,9 +3,9 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
 
     const $ = jQuery,
         css_prefix = 'fcp-advisor-',
-        css_class = css_prefix+'holder',
-        css_status_class = css_prefix+'holder-status';
-    let init_val = '';
+        css_class = css_prefix+'holder';
+    let init_val = '',
+        input_delay = setTimeout( ()=>{} );
 
     if ( !$input || !$input instanceof $ || !arr ) { return }
     
@@ -17,7 +17,8 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
         list_holder_fill();
     });
     $input.on( 'input', function() {
-        list_holder_fill();
+        clearTimeout( input_delay );
+        input_delay = setTimeout( list_holder_fill, 500 ); // ++ make abort immediately, but request delay
     });
     $input.on( 'keydown', function(e) {
         if ( ~['ArrowDown','ArrowUp'].indexOf( e.key ) ) {
@@ -217,3 +218,4 @@ function FCP_Advisor($input, arr, options = {}, func = ()=>{}) {
 // ++ add cache to search by already entered phrase
 // ++ abort all if the field got cleared
 // ++? appear the loading after 0.3s
+// ++ the option to prevent the bar from closing, just remove the <li>
