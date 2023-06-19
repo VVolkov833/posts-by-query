@@ -95,11 +95,11 @@ add_action( 'rest_api_init', function () {
             break;
         }
 
-        if ( FCPPBK_DEV ) { usleep( rand(0, 1000000) ); } // simulate server responce delay
-
         return [
             'methods'  => 'GET',
             'callback' => function( \WP_REST_Request $request ) use ( $wp_query_args, $format_output ) {
+
+                if ( FCPPBK_DEV ) { usleep( rand(0, 1000000) ); } // simulate server responce delay
 
                 $wp_query_args['s'] = $request['search'];
 
