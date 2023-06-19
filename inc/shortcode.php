@@ -13,6 +13,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
     if ( !in_array( get_post_type(), get_types_to_apply_to() ) ) { return; }
 
     $settings = get_settings();
+    $queried_id = get_queried_object_id();
 
     // styles
     // inline the global settings
@@ -44,11 +45,9 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
         wp_add_inline_style( $handle, css_minify( $settings['additional-css'] ) );
     }
 
-    // wp_reset_query(); // ++ investigate when to apply
-
     $metas = array_map( function( $value ) { // get the meta values
         return $value[0];
-    }, array_filter( get_post_meta( get_queried_object_id() ), function($key) { // get only meta for the plugin
+    }, array_filter( get_post_meta( $queried_id ), function($key) { // get only meta for the plugin
         return strpos( $key, FCPPBK_PREF ) === 0;
     }, ARRAY_FILTER_USE_KEY ) );
 
@@ -58,13 +57,11 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
         return $result;
     }, 0 );
 
-    $current_id = empty( get_queried_object() ) ? 0 : get_queried_object()->ID;
-
     $wp_query_args = [
         'post_type' => get_types_to_search_among(),
         'post_status' => 'publish',
         'posts_per_page' => $limit,
-        'post__not_in' => [ $current_id ], // exclude self
+        'post__not_in' => [ $queried_id ], // exclude self
         'lang' => 'all',
     ];
 
@@ -77,8 +74,11 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
             $wp_query_args += [ 'post__in' => $ids, 'orderby' => 'post__in' ];
         break;
         case ( 'query' ):
-            $query = $metas[ FCPPBK_PREF.'query' ];
-            if ( trim( $query ) === '' ) { return; }
+            $query = trim( $metas[ FCPPBK_PREF.'query' ] );
+            if ( $query === '' && $settings['unfilled-behavior'] === 'search-by-title' ) { // ++-- && is_single( $queried_id ) doesn't work somehow
+                $query = trim( get_the_title( $queried_id ) );
+            }
+            if ( $query === '' ) { return; }
             $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC', 's' => $query ];
         break;
         default:
