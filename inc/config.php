@@ -57,7 +57,7 @@ function get_styling_variants() { // ++add by scanning the folder
     ];
 }
 
-function get_default_values() { // apply on install && only planned to be usef in fields, which must not be empty // ++ turn to the constant
+function get_default_values() { // apply on install && only planned to be usef in fields, which must not be empty // ++ turn to the constant ++!! set up them all by the structure
     return [
         'main-color' => '#007cba',
         'secondary-color' => '#abb8c3',

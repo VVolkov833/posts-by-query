@@ -19,6 +19,7 @@ function settings_structure() {
             ['Style', 'select', [ 'options' => '%get_styling_variants' ]],
             ['Additional CSS', 'textarea', [ 'filter' => 'css' ]],
             ['Limit the list', 'number', [ 'placeholder' => '10', 'step' => 1, 'comment' => 'If the Layout Setting contains the List option, this number will limit the amount of posts in it', 'filter' => 'integer' ]],
+            ['Minimum posts', 'number', [ 'placeholder' => '0', 'step' => 1, 'comment' => 'Minimum number of posts found to be printed. Doesn\'t refer to the List of particular posts', 'filter' => 'integer' ]],
             ['Default thumbnail', 'image', [ 'comment' => 'This image is shown, if a post doesn\'t have the featured image', 'className' => 'image' ]],
             ['Thumbnail size', 'select', [ 'options' => '%thumbnail_sizes' ]],
             ['Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols', 'filter' => 'integer' ]],
@@ -35,6 +36,7 @@ function settings_structure() {
             ['CSS Class', 'text'],
             ['Select from', 'checkboxes', [ 'options' => '%get_public_post_types', 'comment' => 'Pick the post types in which the search is performed' ]],
             ['Apply to', 'checkboxes', [ 'options' => '%get_public_post_types', 'comment' => 'This plugin will be applied to posts of these post types' ]],
+            ['Unfilled behavior', 'select', [ 'options' => [ '' => 'Hide', 'search-by-title' => 'Search by Title' ] ]],
         ],
     ];
 
