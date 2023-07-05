@@ -87,7 +87,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
 
     $search = new \WP_Query( $wp_query_args );
 
-    if ( !$search->have_posts() || !( $search->found_posts >= ( $settings['minimum-posts'] ?: 0 ) ) ) { return; }
+    if ( !$search->have_posts() || !( $search->found_posts >= ( $settings['minimum-posts'] ?? 0 ?: 0 ) ) ) { return; }
 
     $get_template = function($name, $is_part = true) {
         static $cached = [];

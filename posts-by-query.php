@@ -46,7 +46,7 @@ register_activation_hook( __FILE__, function() {
     // the about-the-plugin texts
     // !!title and description must be more like for printing to understans blah blah check out the competitors
 // after publishing add thumbnails and the preview page
-
+// test for errors and warnings on empty values in settings
 // ++ if Posts by Search Query & Date become empty, the old query still prints what was found
 // ++ turn posts-by-query into a constant and avoid conflict with FCPPBK_SETT
 // ++option to print automatically?
