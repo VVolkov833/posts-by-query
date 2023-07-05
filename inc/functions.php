@@ -34,18 +34,24 @@ function get_settings() {
 }
 
 function get_types_to_apply_to() {
-    return filter_by_public_types( get_settings()['apply-to'] );
+    return filter_by_public_types( get_settings()['apply-to'] ?? [] );
 }
 function get_types_to_search_among() {
-    return filter_by_public_types( get_settings()['select-from'] );
+    return filter_by_public_types( get_settings()['select-from'] ?? [] );
 }
 
 function css_minify($css) {
-    $css = preg_replace( '/\/\*(?:.*?)*\*\//', '', $css ); // remove comments
-    $css = preg_replace( '/\s+/', ' ', $css ); // one-line & only single speces
-    $css = preg_replace( '/ ?([\{\};:\>\~\+]) ?/', '$1', $css ); // remove spaces
-    $css = preg_replace( '/\+(\d)/', ' + $1', $css ); // restore spaces in functions
-    $css = preg_replace( '/(?:[^\}]*)\{\}/', '', $css ); // remove empty properties
+    $preg_replace = function($regexp, $replace, $string) { // avoid null result so that css still works even though not fully minified
+        return preg_replace( $regexp, $replace, $string ) ?: $string . '/* --- failed '.$regexp.', '.$replace.' */';
+    };
+    $css = $preg_replace( '/\s+/', ' ', $css ); // one-line & only single speces
+    $css = $preg_replace( '/ ?\/\*(?:.*?)\*\/ ?/', '', $css ); // remove comments
+    $css = $preg_replace( '/ ?([\{\};:\>\~\+]) ?/', '$1', $css ); // remove spaces
+    $css = $preg_replace( '/\+(\d)/', ' + $1', $css ); // restore spaces in functions
+    $css = $preg_replace( '/(?:[^\}]*)\{\}/', '', $css ); // remove empty properties
     $css = str_replace( [';}', '( ', ' )'], ['}', '(', ')'], $css ); // remove last ; and spaces
+    // ++ should also remove 0 from 0.5, but not from svg-s?
+    // ++ try replacing ', ' with ','
+    // ++ remove space between %3E %3C and before %3E and /%3E
     return trim( $css );
 };

@@ -28,9 +28,10 @@ add_action( 'admin_enqueue_scripts', function() {
         'settings_page_posts-by-query' => [ 'settings', 'color', 'media', 'codemirror' ]
     ];
 
-
     $screen = get_current_screen();
     if ( !isset( $screen ) || !is_object( $screen ) || !isset( $files[ $screen->base ] ) ) { return; }
+
+    if ( $screen->base === 'post' && !in_array( $screen->post_type, get_types_to_apply_to() ) ) { return; }
 
     $assets_path = FCPPBK_DIR.'assets';
     foreach ( scandir( $assets_path ) as $v ) {
@@ -48,6 +49,8 @@ add_action( 'admin_enqueue_scripts', function() {
         if ( $ext === 'css' ) { wp_enqueue_style( $handle, $url, [], FCPPBK_VER, 'all' ); }
         if ( $ext === 'js' ) { wp_enqueue_script( $handle, $url, [], FCPPBK_VER, false ); }
     }
+
+    if ( $screen->base !== 'settings_page_posts-by-query' ) { return; }
 
     // wp color picker
     wp_enqueue_script( 'wp-color-picker' );
@@ -67,10 +70,6 @@ add_action( 'admin_enqueue_scripts', function() {
 add_action( 'rest_api_init', function () {
 
     $route_args = function($search_by) {
-
-        if ( empty( get_types_to_search_among() ) ) {
-            return new \WP_Error( 'post_type_not_selected', 'Post type not selected', [ 'status' => 404 ] );
-        }
 
         $wp_query_args = [
             'post_type' => get_types_to_search_among(),
@@ -99,6 +98,10 @@ add_action( 'rest_api_init', function () {
         return [
             'methods'  => 'GET',
             'callback' => function( \WP_REST_Request $request ) use ( $wp_query_args, $format_output ) {
+
+                if ( empty( get_types_to_search_among() ) ) {
+                    return new \WP_Error( 'post_type_not_selected', 'Post type not selected', [ 'status' => 404 ] );
+                }
 
                 if ( FCPPBK_DEV ) { usleep( rand(0, 1000000) ); } // simulate server responce delay
 

@@ -65,7 +65,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
         'lang' => 'all',
     ];
 
-    $search_by = $metas[ FCPPBK_PREF.'variants' ];
+    $search_by = $metas[ FCPPBK_PREF.'variants' ] ?? 'list';
 
     switch ( $search_by ) {
         case ( 'list' ):
