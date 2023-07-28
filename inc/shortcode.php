@@ -12,8 +12,10 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
     if ( empty( get_types_to_search_among() ) ) { return; }
     if ( !in_array( get_post_type(), get_types_to_apply_to() ) ) { return; }
 
-    $settings = get_settings();
     $queried_id = get_queried_object_id();
+    if ( !is_single( $queried_id ) ) { return; }
+
+    $settings = get_settings();
 
     // styles
     // inline the global settings
