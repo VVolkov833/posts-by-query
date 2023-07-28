@@ -66,24 +66,29 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
     ];
 
     $search_by = $metas[ FCPPBK_PREF.'variants' ] ?? 'list';
+	$unfilled = false;
 
     switch ( $search_by ) {
         case ( 'list' ):
             $ids = unserialize( $metas[ FCPPBK_PREF.'posts' ] );
-            if ( empty( $ids ) ) { return; }
+            if ( empty( $ids ) ) { $unfilled = true; break; }
             $wp_query_args += [ 'post__in' => $ids, 'orderby' => 'post__in' ];
         break;
         case ( 'query' ):
             $query = trim( $metas[ FCPPBK_PREF.'query' ] );
-            if ( $query === '' && $settings['unfilled-behavior'] === 'search-by-title' ) { // ++-- && is_single( $queried_id ) doesn't work somehow
-                $query = trim( get_the_title( $queried_id ) );
-            }
-            if ( $query === '' ) { return; }
+			if ( $query === '' ) { $unfilled = true; break; }
             $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC', 's' => $query ];
         break;
         default:
-            return;
+            $unfilled = true;
     }
+	
+    if ( $unfilled && $settings['unfilled-behavior'] !== 'search-by-title' ) { return; } // ++ improve the logic
+
+	if ( $unfilled && $settings['unfilled-behavior'] === 'search-by-title' ) { // ++-- && is_single( $queried_id ) doesn't work somehow
+		$query = trim( get_the_title( $queried_id ) );
+		$wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC', 's' => $query ];
+	}
 
     $search = new \WP_Query( $wp_query_args );
 
