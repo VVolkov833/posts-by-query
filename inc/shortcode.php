@@ -8,12 +8,14 @@ defined( 'ABSPATH' ) || exit;
 add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!!
 
     if ( is_admin() ) { return; }
-
     if ( empty( get_types_to_search_among() ) ) { return; }
-    if ( !in_array( get_post_type(), get_types_to_apply_to() ) ) { return; }
 
     $queried_id = get_queried_object_id();
-    if ( !is_single( $queried_id ) && !is_page( $queried_id ) ) { return; } //++!!! this gotta be tested
+    $post_type = get_post_type( $queried_id );
+
+    if ( !in_array( $post_type, get_types_to_apply_to() ) ) { return; }
+
+    if( !is_singular($post_type) ) { return; }
 
     $settings = get_settings();
 
