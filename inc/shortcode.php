@@ -13,7 +13,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
     if ( !in_array( get_post_type(), get_types_to_apply_to() ) ) { return; }
 
     $queried_id = get_queried_object_id();
-    if ( !is_single( $queried_id ) ) { return; }
+    if ( !is_single( $queried_id ) && !is_page( $queried_id ) ) { return; } //++!!! this gotta be tested
 
     $settings = get_settings();
 
