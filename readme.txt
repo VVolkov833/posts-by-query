@@ -2,9 +2,9 @@
 Contributors: Firmcatalyst
 Tags: posts, list posts
 Requires at least: 5.8
-Tested up to: 6.2
+Tested up to: 6.3
 Requires PHP: 7.4
-Stable tag: 1.0.5
+Stable tag: 1.0.6
 Author: Firmcatalyst, Vadim Volkov, Aude Jamier
 Author URI: https://firmcatalyst.com
 License: GPL v3 or later
