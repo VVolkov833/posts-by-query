@@ -153,7 +153,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
             'title' => get_the_title( $p ),
             'date' => isset( $settings['hide-date'] ) ? '' : get_the_date( '', $p ),
             'datetime_attr' => isset( $settings['hide-date'] ) ? '' : get_the_date( 'Y-m-d', $p ),
-            'excerpt' => isset( $settings['hide-excerpt'] ) ? '' : esc_html( $crop_excerpt( get_the_excerpt( $p ), $settings['excerpt-length'] ) ),
+            'excerpt' => isset( $settings['hide-excerpt'] ) ? '' : esc_html( $crop_excerpt( wp_strip_all_tags( get_the_content( null, false, $p ), true ), $settings['excerpt-length'] ?: 200 ) ),
             'category' => empty( $categories ) ? '' : esc_html( $categories[0]->name ),
             'category_link' => empty( $categories ) ? '' : get_category_link( $categories[0]->term_id ),
             'thumbnail' => $thumbnail,

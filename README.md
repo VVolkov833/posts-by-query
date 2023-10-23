@@ -1,6 +1,6 @@
-# FCP Posts by Search Query
+# Posts by Search Query
 
-Implement a list of relevant posts to particular pages with a search query or exact list of posts. Easy pick and add.
+Implement a list of relevant posts to particular pages with a search query or exact list of posts. Easy pick and add. Print with the shortcode `[fcppbk]`
 
 ## Features
 
@@ -8,7 +8,7 @@ Implement a list of relevant posts to particular pages with a search query or ex
 * Layouts and styling variants
 * Simple and flexible inteface for picking posts
 * Apply to any post / page / custom post-type
-* Implement with the \[fcppbk\] shortcode
+* Implement with the `\[fcppbk\]` shortcode
 * It minifies the css before printing
 * Polylang friendly
 
@@ -20,5 +20,5 @@ Implement a list of relevant posts to particular pages with a search query or ex
 
 * Install and activate the plugin
 * Go to "Settings" -> "Posts by Query" to change the plugin settings
-* Implement the shortcode \[fcppbk\] where you want the posts to be printed
+* Implement the shortcode `\[fcppbk\]` where you want the posts to be printed
 * Go to the post / page editor, scroll to the bottom and add the search query or pick particular posts to be printed

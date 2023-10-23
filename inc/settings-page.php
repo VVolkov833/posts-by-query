@@ -22,7 +22,7 @@ function settings_structure() {
             ['Minimum posts', 'number', [ 'placeholder' => '0', 'step' => 1, 'comment' => 'Minimum number of posts found to be printed. Doesn\'t refer to the List of particular posts', 'filter' => 'integer' ]],
             ['Default thumbnail', 'image', [ 'comment' => 'This image is shown, if a post doesn\'t have the featured image', 'className' => 'image' ]],
             ['Thumbnail size', 'select', [ 'options' => '%thumbnail_sizes' ]],
-            ['Excerpt length', 'number', [ 'step' => 1, 'comment' => 'Cut the excerpt to the number of symbols', 'filter' => 'integer' ]],
+            ['Excerpt length', 'number', [ 'step' => 1, 'comment' => 'The length of the excerpt in symbols. Full words are preserved.', 'filter' => 'integer', 'placeholder' => '200' ]],
             ['"Read more" text', 'text', [ 'placeholder' => __( 'Read more' ) ]],
         ],
         'Hide details' => [

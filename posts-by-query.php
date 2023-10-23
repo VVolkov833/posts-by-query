@@ -1,13 +1,13 @@
 <?php
 /*
-Plugin Name: FCP Posts by Search Query
-Description: Implement a list of relevant posts to particular pages with a search query or exact list of posts. Easy pick and add.
-Version: 1.0.6
+Plugin Name: Posts by Search Query
+Description: Implement a list of relevant posts to particular pages with a search query or exact list of posts. Easy pick and add. Print with the shortcode <code>[fcppbk]</code>
+Version: 1.0.7
 Requires at least: 5.8
 Tested up to: 6.3
 Requires PHP: 7.4
 Author: Firmcatalyst, Vadim Volkov, Aude Jamier
-Author URI: https://firmcatalyst.com
+Author URI: https://firmcatalyst.com/about/
 License: GPL v3 or later
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 */
@@ -21,6 +21,7 @@ define( 'FCPPBK_VER', get_file_data( __FILE__, [ 'ver' => 'Version' ] )[ 'ver' ]
 
 define( 'FCPPBK_URL', plugin_dir_url( __FILE__ ) );
 define( 'FCPPBK_DIR', plugin_dir_path( __FILE__ ) );
+define( 'FCPPBK_BSN', plugin_basename(__FILE__) );
 
 
 require FCPPBK_DIR . 'inc/config.php';
@@ -36,6 +37,12 @@ register_activation_hook( __FILE__, function() {
     add_option( FCPPBK_SETT, get_default_values() );
 });
 
+// link the settings from the plugins list
+add_filter( 'plugin_action_links_'.FCPPBK_BSN, function($links) {
+    $settings_link = '<a href="' . esc_url( admin_url( 'options-general.php?page='.dirname(FCPPBK_BSN) ) ) . '">Settings</a>';
+    array_unshift( $links, $settings_link );
+    return $links;
+});
 
 
 /*
