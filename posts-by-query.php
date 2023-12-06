@@ -2,9 +2,9 @@
 /*
 Plugin Name: Posts by Search Query
 Description: Implement a list of relevant posts to particular pages with a search query or exact list of posts. Easy pick and add. Print with the shortcode <code>[fcppbk]</code>
-Version: 1.0.7
+Version: 1.0.8
 Requires at least: 5.8
-Tested up to: 6.3
+Tested up to: 6.4
 Requires PHP: 7.4
 Author: Firmcatalyst, Vadim Volkov, Aude Jamier
 Author URI: https://firmcatalyst.com/about/

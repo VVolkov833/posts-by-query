@@ -139,6 +139,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
         $p = $search->next_post();
 
         // prepare the values to fill in the template
+        $excerpt = $crop_excerpt( ( has_excerpt( $p ) ? get_the_excerpt( $p ) : wp_strip_all_tags( get_the_content( null, false, $p ), true ) ), $settings['excerpt-length'] ?: 200 );
         $categories = isset( $settings['hide-category'] ) ? [] : get_the_category( $p );
 
 		$thumbnail = $settings['thumbnail-size'] ? (
@@ -153,7 +154,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
             'title' => get_the_title( $p ),
             'date' => isset( $settings['hide-date'] ) ? '' : get_the_date( '', $p ),
             'datetime_attr' => isset( $settings['hide-date'] ) ? '' : get_the_date( 'Y-m-d', $p ),
-            'excerpt' => isset( $settings['hide-excerpt'] ) ? '' : esc_html( $crop_excerpt( wp_strip_all_tags( get_the_content( null, false, $p ), true ), $settings['excerpt-length'] ?: 200 ) ),
+            'excerpt' => isset( $settings['hide-excerpt'] ) ? '' : esc_html( $excerpt ),
             'category' => empty( $categories ) ? '' : esc_html( $categories[0]->name ),
             'category_link' => empty( $categories ) ? '' : get_category_link( $categories[0]->term_id ),
             'thumbnail' => $thumbnail,

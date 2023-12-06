@@ -2,15 +2,15 @@
 Contributors: Firmcatalyst
 Tags: posts, list posts
 Requires at least: 5.8
-Tested up to: 6.3
+Tested up to: 6.4
 Requires PHP: 7.4
-Stable tag: 1.0.7
+Stable tag: 1.0.8
 Author: Firmcatalyst, Vadim Volkov, Aude Jamier
 Author URI: https://firmcatalyst.com/about/
 License: GPL v3 or later
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
-Posts by Search Query
+Implement a list of relevant posts to particular pages with a search query or exact list of posts. Easy pick and add. Print with the shortcode `[fcppbk]`
 
 == Description ==
 
