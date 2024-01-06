@@ -43,7 +43,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
 
     // inline the additional CSS
     $handle = FCPPBK_PREF.'additional';
-    if ( $settings['additional-css'] ?? trim( $settings['additional-css'] ) ) {
+    if ( isset($settings['additional-css']) && (trim($settings['additional-css']) !== '') ) {
         wp_register_style( $handle, false );
         wp_enqueue_style( $handle );
         wp_add_inline_style( $handle, css_minify( $settings['additional-css'] ) );
@@ -79,7 +79,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
             $wp_query_args += [ 'post__in' => $ids, 'orderby' => 'post__in' ];
         break;
         case ( 'query' ):
-            $query = trim( $metas[ FCPPBK_PREF.'query' ] );
+            $query = trim( $metas[FCPPBK_PREF.'query'] ?? '' );
 			if ( $query === '' ) { $unfilled = true; break; }
             $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC', 's' => $query ];
         break;
@@ -87,9 +87,9 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
             $unfilled = true;
     }
 	
-    if ( $unfilled && $settings['unfilled-behavior'] !== 'search-by-title' ) { return; } // ++ improve the logic
+    if ( $unfilled && (!isset($settings['unfilled-behavior']) || $settings['unfilled-behavior'] !== 'search-by-title') ) { return; } // ++ improve the logic
 
-	if ( $unfilled && $settings['unfilled-behavior'] === 'search-by-title' ) { // ++-- && is_single( $queried_id ) doesn't work somehow
+	if ( $unfilled && isset($settings['unfilled-behavior']) && $settings['unfilled-behavior'] === 'search-by-title' ) { // ++-- && is_single( $queried_id ) doesn't work somehow
 		$query = trim( get_the_title( $queried_id ) );
 		$wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC', 's' => $query ];
 	}
