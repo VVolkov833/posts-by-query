@@ -4,7 +4,7 @@ Tags: posts, list posts
 Requires at least: 5.8
 Tested up to: 6.4
 Requires PHP: 7.4
-Stable tag: 1.0.8
+Stable tag: 1.0.9
 Author: Firmcatalyst, Vadim Volkov, Aude Jamier
 Author URI: https://firmcatalyst.com/about/
 License: GPL v3 or later
