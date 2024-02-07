@@ -74,12 +74,12 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
 
     switch ( $search_by ) {
         case ( 'list' ):
-            $ids = unserialize( $metas[ FCPPBK_PREF.'posts' ] );
+            $ids = unserialize( $metas[ FCPPBK_PREF.'posts' ] ?? 'a:0:{}' );
             if ( empty( $ids ) ) { $unfilled = true; break; }
             $wp_query_args += [ 'post__in' => $ids, 'orderby' => 'post__in' ];
         break;
         case ( 'query' ):
-            $query = trim( $metas[FCPPBK_PREF.'query'] ?? '' );
+            $query = trim( $metas[ FCPPBK_PREF.'query' ] ?? '' );
 			if ( $query === '' ) { $unfilled = true; break; }
             $wp_query_args += [ 'orderby' => 'date', 'order' => 'DESC', 's' => $query ];
         break;
@@ -132,6 +132,11 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
         $text = rtrim( substr( $text, 0, strrpos( $text, ' ' ) ), ',.…!?&([{-_ "„“' ) . '…';
         return $text;
     };
+    $content_to_excerpt_format = function($content) {
+        $content = \wp_strip_all_tags( $content, true );
+        $content = preg_replace( '/\[[^\]]+\]/', '', $content );
+        return $content;
+    };
 
     $posts = [];
     while ( $search->have_posts() ) {
@@ -139,7 +144,7 @@ add_shortcode( FCPPBK_SLUG, function() { // ++!! what if it is outside the loop!
         $p = $search->next_post();
 
         // prepare the values to fill in the template
-        $excerpt = $crop_excerpt( ( has_excerpt( $p ) ? get_the_excerpt( $p ) : wp_strip_all_tags( get_the_content( null, false, $p ), true ) ), $settings['excerpt-length'] ?: 200 );
+        $excerpt = $crop_excerpt( ( has_excerpt( $p ) ? get_the_excerpt( $p ) : $content_to_excerpt_format( get_the_content( null, false, $p ) ) ), $settings['excerpt-length'] ?: 200 );
         $categories = isset( $settings['hide-category'] ) ? [] : get_the_category( $p );
 
 		$thumbnail = $settings['thumbnail-size'] ? (
